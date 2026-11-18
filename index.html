@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>下一站，府城｜像素風 RPG</title>
+<style>
+  :root {
+    --bg-dark: #14101d;
+    --panel-bg: #1e1b2e;
+    --border-light: #f4d35e;
+    --border-mid: #ee964b;
+    --text-main: #f7f3e3;
+    --accent: #4ecdc4;
+  }
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  body {
+    margin: 0; padding: 12px;
+    background: var(--bg-dark) radial-gradient(circle at 50% 20%, #2b2340 0%, #14101d 70%);
+    color: var(--text-main);
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", monospace;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh;
+  }
+  #game-shell {
+    width: 100%; max-width: 680px; background: var(--panel-bg);
+    border: 4px solid var(--border-light);
+    box-shadow: 0 0 0 4px #2a2438, 0 18px 40px rgba(0,0,0,0.7);
+    border-radius: 6px; padding: 10px; position: relative;
+  }
+  #hud {
+    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+    gap: 8px; background: #120f1c; border: 2px solid #4a4266; padding: 8px 10px; margin-bottom: 8px; font-size: 13px;
+  }
+  .hud-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badge { background: #2c2544; border: 1px solid #6b5fa0; padding: 3px 8px; border-radius: 3px; color: #ffe69a; font-weight: bold; }
+  #quest-text { color: #9bf6ff; font-size: 13px; }
+  .inventory-bar {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%;
+    padding-top: 6px; border-top: 1px dashed #3a3254; font-size: 12px;
+  }
+  .inv-slot { padding: 2px 7px; border: 1px solid #4a4266; background: #1a1626; color: #7a7294; border-radius: 3px; transition: all 0.3s; }
+  .inv-slot.owned { border-color: var(--border-light); background: #3b2d1f; color: #ffd166; font-weight: bold; box-shadow: 0 0 6px rgba(244,211,94,0.35); }
+  #sound-btn { background: #2c2544; color: #fff; border: 1px solid #6b5fa0; padding: 3px 8px; cursor: pointer; font-size: 12px; border-radius: 3px; }
+  #sound-btn:hover { background: #3e355e; }
+  #stage-container { position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border: 3px solid #3a3254; overflow: hidden; }
+  canvas#game-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  .dizzy-effect { animation: dizzySpin 2.2s ease-in-out forwards; }
+  @keyframes dizzySpin {
+    0% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+    40% { transform: scale(1.2) rotate(360deg); filter: hue-rotate(90deg) brightness(1.3); }
+    75% { transform: scale(0.7) rotate(720deg); filter: brightness(2.5) blur(3px); }
+    100% { transform: scale(1) rotate(720deg); filter: brightness(1) blur(0); }
+  }
+  .overlay {
+    position: absolute; inset: 0; background: rgba(16,12,24,0.92);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; z-index: 20;
+  }
+  .hidden { display: none !important; }
+  #start-screen { background: linear-gradient(180deg, rgba(22,16,38,0.92) 0%, rgba(45,25,40,0.95) 65%, rgba(20,14,24,0.98) 100%); }
+  .pixel-title { font-size: clamp(26px, 5vw, 40px); color: var(--border-light); text-shadow: 4px 4px 0 #7a3b2e, -2px -2px 0 #1f172e; letter-spacing: 4px; margin: 0 0 8px 0; }
+  .subtitle { color: #ffd6a5; font-size: 14px; margin-bottom: 24px; letter-spacing: 2px; }
+  .pixel-btn {
+    background: #e07a5f; color: #fff; border: 3px solid #f4d35e; box-shadow: 0 4px 0 #8c3b2b;
+    padding: 10px 24px; font-size: 15px; font-weight: bold; cursor: pointer; letter-spacing: 2px; font-family: inherit;
+  }
+  .pixel-btn:hover { background: #f28f74; }
+  .pixel-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #8c3b2b; }
+  .pixel-btn.secondary { background: #3d5a80; border-color: #98c1d9; box-shadow: 0 4px 0 #24364d; font-size: 14px; padding: 8px 18px; }
+  #dialogue-box {
+    position: absolute; left: 10px; right: 10px; bottom: 10px; background: rgba(18,16,32,0.95);
+    border: 3px solid var(--border-light); box-shadow: 0 0 0 2px #120f1c; padding: 10px 14px; z-index: 15;
+    cursor: pointer; display: flex; gap: 12px; align-items: flex-start;
+  }
+  #speaker-portrait { width: 48px; height: 48px; flex-shrink: 0; background: #2b2540; border: 2px solid #6b5fa0; image-rendering: pixelated; margin-top: 2px; }
+  .dialogue-body { flex: 1; min-width: 0; }
+  #speaker-name { display: inline-block; background: var(--border-mid); color: #14101d; font-weight: bold; font-size: 13px; padding: 2px 10px; margin-bottom: 5px; border-radius: 2px; }
+  #dialogue-text { font-size: 14px; line-height: 1.55; min-height: 44px; color: #fff; }
+  #dialogue-next { text-align: right; font-size: 12px; color: var(--border-light); animation: blink 0.9s infinite; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+  #quiz-overlay { background: rgba(14,12,26,0.94); justify-content: flex-start; padding: 14px; overflow-y: auto; }
+  .quiz-card { width: 100%; max-width: 520px; background: #231f38; border: 3px solid var(--accent); padding: 16px; text-align: left; margin: auto; }
+  .quiz-header { display: flex; justify-content: space-between; font-size: 13px; color: var(--accent); margin-bottom: 8px; border-bottom: 1px solid #3f395e; padding-bottom: 6px; }
+  .quiz-question { font-size: 15px; font-weight: bold; line-height: 1.5; margin-bottom: 12px; color: #fff; }
+  .quiz-options { display: grid; gap: 8px; }
+  .quiz-opt { background: #171426; border: 2px solid #534b78; color: #f7f3e3; padding: 9px 12px; text-align: left; font-size: 14px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .quiz-opt:hover:not(:disabled) { border-color: var(--border-light); background: #2c2647; }
+  .quiz-opt.correct { background: #1e4d3b; border-color: #52b788; color: #d8f3dc; }
+  .quiz-opt.wrong { background: #591d24; border-color: #ff6b6b; color: #ffd6d6; }
+  .quiz-feedback { margin-top: 10px; font-size: 13px; line-height: 1.5; padding: 8px; background: #141122; border-left: 3px solid var(--border-light); }
+  #mg-hud {
+    position: absolute; top: 8px; left: 8px; right: 8px; background: rgba(15,12,25,0.88);
+    border: 2px solid var(--accent); padding: 6px 10px; display: flex; flex-wrap: wrap;
+    justify-content: space-between; align-items: center; gap: 6px; font-size: 13px; z-index: 10;
+  }
+  .mg-mini-btn { background: #3d5a80; color: #fff; border: 1px solid #98c1d9; padding: 4px 8px; font-size: 12px; cursor: pointer; border-radius: 2px; font-family: inherit; }
+  .mg-mini-btn:hover:not(:disabled) { filter: brightness(1.15); }
+  .mg-mini-btn:disabled { cursor: not-allowed; }
+  .dog-inspect-card { background: #231f38; border: 3px solid var(--border-light); padding: 16px; max-width: 380px; width: 90%; }
+  #controls-bar { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #120f1c; border: 2px solid #3a3254; padding: 10px 14px; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 38px); grid-template-rows: repeat(2, 34px); gap: 4px; }
+  .ctrl-btn { background: #2c2544; color: #fff; border: 2px solid #6b5fa0; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .ctrl-btn:active { background: #4a3f73; transform: scale(0.95); }
+  .action-btns { display: flex; gap: 8px; align-items: center; }
+  .act-main { background: #e07a5f; border-color: #f4d35e; padding: 12px 18px; font-size: 14px; }
+  .hint-keys { font-size: 12px; color: #a69ec4; line-height: 1.5; }
+  /* 僅針對手機螢幕優化，電腦版 (>640px) 完全維持原樣 */
+  @media (max-width: 640px) {
+    body { padding: 4px; justify-content: flex-start; }
+    #game-shell { padding: 6px; border-width: 3px; }
+
+    /* 縮減頂部狀態列佔高，讓畫面更開闊 */
+    #hud { padding: 5px 8px; gap: 4px; margin-bottom: 6px; font-size: 12px; }
+    .badge { padding: 2px 6px; font-size: 11px; }
+    #quest-text { font-size: 11px; }
+    .inventory-bar { gap: 4px; padding-top: 4px; font-size: 11px; }
+    .inv-slot { padding: 2px 5px; }
+
+    /* 放大手機虛擬方向鍵與互動按鈕（好按不誤觸） */
+    .hint-keys { display: none; }
+    #controls-bar { padding: 10px 8px; margin-top: 8px; justify-content: space-between; gap: 8px; }
+    .dpad {
+      grid-template-columns: repeat(3, clamp(46px, 13.5vw, 56px));
+      grid-template-rows: repeat(2, clamp(44px, 12.5vw, 52px));
+      gap: 6px;
+    }
+    .ctrl-btn { font-size: 20px; border-radius: 8px; }
+    .action-btns { flex: 1; justify-content: flex-end; }
+    .act-main {
+      width: 100%; max-width: 132px; min-height: 76px;
+      padding: 14px 12px; font-size: 15px; border-radius: 10px;
+    }
+
+    /* 縮小畫布內浮動介面，避免擋住遊戲視野 */
+    #mg-hud { top: 4px; left: 4px; right: 4px; padding: 4px 6px; font-size: 11px; gap: 4px; }
+    .mg-mini-btn { padding: 3px 6px; font-size: 11px; }
+
+    #dialogue-box { left: 6px; right: 6px; bottom: 6px; padding: 6px 8px; gap: 8px; }
+    #speaker-portrait { width: 38px; height: 38px; }
+    #speaker-name { font-size: 11px; padding: 1px 7px; margin-bottom: 3px; }
+    #dialogue-text { font-size: 12px; line-height: 1.4; min-height: 34px; max-height: 74px; overflow-y: auto; }
+    #dialogue-next { font-size: 11px; }
+
+    /* 問答、開始、結局與小狗特寫視窗改為緊湊可捲動 */
+    .overlay { padding: 10px; overflow-y: auto; }
+    #start-screen .pixel-title { font-size: 24px; margin-bottom: 4px; }
+    #start-screen .subtitle { font-size: 12px; margin-bottom: 10px; }
+    #start-screen div { font-size: 12px !important; line-height: 1.45 !important; margin-bottom: 12px !important; }
+    #ending-screen .pixel-title { font-size: 22px !important; }
+    #ending-screen p { font-size: 12px !important; line-height: 1.5 !important; margin: 8px 0 12px 0 !important; }
+    .pixel-btn { padding: 8px 18px; font-size: 14px; }
+
+    #quiz-overlay { padding: 6px; }
+    .quiz-card { padding: 10px; }
+    .quiz-header { font-size: 11px; margin-bottom: 6px; padding-bottom: 4px; }
+    .quiz-question { font-size: 13px; margin-bottom: 8px; line-height: 1.4; }
+    .quiz-options { gap: 5px; }
+    .quiz-opt { padding: 7px 9px; font-size: 12px; }
+    .quiz-feedback { margin-top: 6px; padding: 6px; font-size: 11px; }
+
+    .dog-inspect-card { padding: 10px; }
+    .dog-inspect-card h3 { font-size: 14px; margin-bottom: 4px !important; }
+    #dog-preview { width: 68px !important; height: 68px !important; margin: 4px auto !important; }
+    #dog-desc { font-size: 12px !important; margin: 6px 0 !important; line-height: 1.4 !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="game-shell">
+  <div id="hud">
+    <div class="hud-group">
+      <span class="badge" id="loc-name">臺南舊火車站</span>
+      <span id="quest-text">準備出發...</span>
+    </div>
+    <button id="sound-btn" onclick="AudioFX.toggle()">🔊 音樂/音效：開</button>
+    <div class="inventory-bar">
+      <span>背包：</span>
+      <span class="inv-slot" id="item-mirror">機車後照鏡</span>
+      <span class="inv-slot" id="item-incense">一炷香</span>
+      <span class="inv-slot" id="item-cracker">蝦餅</span>
+      <span class="inv-slot" id="item-ticket">火車票</span>
+    </div>
+  </div>
+
+  <div id="stage-container">
+    <canvas id="game-canvas" width="512" height="384"></canvas>
+
+    <div id="mg-hud" class="hidden">
+      <span id="mg-status">小遊戲進行中</span>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="mg-mini-btn hidden" id="mg-undo-btn" onclick="MG1.undo()">↶ 退一步 (Z)</button>
+        <button class="mg-mini-btn" id="mg-reset-btn" onclick="MinigameMgr.restartCurrent()">↻ 重置/重來</button>
+        <button class="mg-mini-btn" id="mg-skip-btn" style="background:#7a4988; border-color:#d8b4e2;" onclick="MinigameMgr.skipCurrent()">⏭ 跳過 (3)</button>
+      </div>
+    </div>
+
+    <div id="dialogue-box" class="hidden" onclick="Dialogue.advance()">
+      <canvas id="speaker-portrait" width="48" height="48"></canvas>
+      <div class="dialogue-body">
+        <div id="speaker-name">主角</div>
+        <div id="dialogue-text"></div>
+        <div id="dialogue-next">▼ 點擊或按空白鍵繼續</div>
+      </div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+      <div style="font-size: 12px; color: #4ecdc4; margin-bottom: 6px;">PIXEL RPG ADVENTURE</div>
+      <h1 class="pixel-title">下一站，府城</h1>
+      <div class="subtitle">跨越百年車站與府城街巷的奇幻旅程</div>
+      <div style="font-size: 13px; color: #ccc3e3; max-width: 400px; line-height: 1.7; margin-bottom: 22px;">
+        在臺南火車站的長椅上醒來，口袋裡的車票卻不翼而飛……<br>
+        為了尋回車票，你將穿越整個臺南市區…。
+      </div>
+      <button class="pixel-btn" onclick="Game.start()">▶ 開始遊戲</button>
+    </div>
+
+    <div id="quiz-overlay" class="overlay hidden">
+      <div class="quiz-card">
+        <div class="quiz-header">
+          <span id="quiz-title">府城考驗</span>
+          <span id="quiz-progress">第 1 / 3 題</span>
+        </div>
+        <div class="quiz-question" id="quiz-q-text">題目載入中...</div>
+        <div class="quiz-options" id="quiz-opts"></div>
+        <div class="quiz-feedback hidden" id="quiz-fb"></div>
+        <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <button class="mg-mini-btn" id="quiz-skip-btn" style="background:#7a4988; border-color:#d8b4e2; padding:6px 10px;" onclick="MinigameMgr.skipCurrent()">⏭ 跳過此關 (剩 3 次)</button>
+          <button class="pixel-btn hidden" id="quiz-next-btn" onclick="QuizRunner.next()">繼續</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="result-overlay" class="overlay hidden">
+      <h2 id="res-title" style="color:#ff6b6b; margin:0 0 10px 0;">挑戰失敗</h2>
+      <p id="res-msg" style="max-width:380px; line-height:1.6; color:#eee; margin-bottom:20px;"></p>
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <button class="pixel-btn" id="res-btn">再試一次</button>
+        <button class="pixel-btn secondary hidden" id="res-skip-btn" onclick="MinigameMgr.skipCurrent()">⏭ 跳過此關 (剩 3 次)</button>
+      </div>
+    </div>
+
+    <div id="dog-overlay" class="overlay hidden">
+      <div class="dog-inspect-card">
+        <h3 style="margin:0 0 8px 0; color:#f4d35e;">仔細觀察這隻小狗</h3>
+        <canvas id="dog-preview" width="64" height="64" style="width:96px; height:96px; background:#14101d; border:2px solid #6b5fa0; margin:6px auto; display:block;"></canvas>
+        <p id="dog-desc" style="font-size:14px; line-height:1.6; color:#fff; margin:10px 0;"></p>
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button class="pixel-btn" onclick="MG7.chooseDog()">就是這隻！</button>
+          <button class="pixel-btn secondary" onclick="MG7.closeInspect()">再看看</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="ending-screen" class="overlay hidden" style="background: linear-gradient(180deg, #1b243b 0%, #2b3a55 60%, #14101d 100%);">
+      <div style="color:#4ecdc4; font-size:13px; margin-bottom:6px;">THE END</div>
+      <h2 class="pixel-title" style="font-size:28px;">下一站，府城</h2>
+      <p style="max-width:430px; line-height:1.8; font-size:14px; color:#f7f3e3; margin: 14px 0 22px 0;">
+        新臺南火車站的廣播響起，你緊握著失而復得的車票。<br>
+        透過玻璃帷幕望出去，那棟 1936 年落成的國定古蹟舊車站靜靜佇立在陽光下。<br>
+        他將化作府城永恆的文化記憶，而你的旅程，正要再次啟程。
+      </p>
+      <button class="pixel-btn" onclick="location.reload()">↻ 重新開始旅程</button>
+    </div>
+  </div>
+
+  <div id="controls-bar">
+    <div class="dpad">
+      <div></div>
+      <button class="ctrl-btn" onmousedown="Input.hold('up',true)" onmouseup="Input.hold('up',false)" onmouseleave="Input.hold('up',false)" ontouchstart="event.preventDefault();Input.hold('up',true)" ontouchend="event.preventDefault();Input.hold('up',false)">▲</button>
+      <div></div>
+      <button class="ctrl-btn" onmousedown="Input.hold('left',true)" onmouseup="Input.hold('left',false)" onmouseleave="Input.hold('left',false)" ontouchstart="event.preventDefault();Input.hold('left',true)" ontouchend="event.preventDefault();Input.hold('left',false)">◀</button>
+      <button class="ctrl-btn" onmousedown="Input.hold('down',true)" onmouseup="Input.hold('down',false)" onmouseleave="Input.hold('down',false)" ontouchstart="event.preventDefault();Input.hold('down',true)" ontouchend="event.preventDefault();Input.hold('down',false)">▼</button>
+      <button class="ctrl-btn" onmousedown="Input.hold('right',true)" onmouseup="Input.hold('right',false)" onmouseleave="Input.hold('right',false)" ontouchstart="event.preventDefault();Input.hold('right',true)" ontouchend="event.preventDefault();Input.hold('right',false)">▶</button>
+    </div>
+
+    <div class="hint-keys">
+      <strong>鍵盤操作：</strong><br>
+      移動：方向鍵 / WASD<br>
+      互動 / 對話：空白鍵 / Enter
+    </div>
+
+    <div class="action-btns">
+      <button class="ctrl-btn act-main" onclick="Input.triggerAction()">互動 / 調查</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   1. Web Audio 背景音樂（一般＆感人雙曲目）與音效系統
+========================================================= */
+const AudioFX = {
+  ctx: null, masterGain: null, bgmFilter: null, enabled: true,
+  bgmRunning: false, bgmTimer: null, bgmStep: 0, bgmTheme: 'main',
+
+  melody: [
+    329.63,392.00,523.25,392.00,659.25,0,587.33,523.25, 440.00,0,523.25,440.00,392.00,0,329.63,0,
+    349.23,440.00,523.25,440.00,392.00,0,329.63,261.63, 293.66,329.63,392.00,440.00,392.00,0,0,0,
+    329.63,392.00,523.25,587.33,659.25,0,783.99,659.25, 523.25,0,440.00,523.25,587.33,0,523.25,440.00,
+    349.23,392.00,440.00,523.25,493.88,0,392.00,293.66, 329.63,0,261.63,0,261.63,0,0,0
+  ],
+  bass: [
+    130.81,0,196.00,0,130.81,0,196.00,0, 110.00,0,164.81,0,110.00,0,164.81,0,
+    87.31,0,174.61,0,130.81,0,196.00,0, 98.00,0,146.83,0,196.00,0,146.83,0,
+    130.81,0,196.00,0,164.81,0,123.47,0, 110.00,0,164.81,0,87.31,0,130.81,0,
+    146.83,0,220.00,0,98.00,0,196.00,0, 130.81,0,196.00,0,130.81,0,98.00,0
+  ],
+  emoMelody: [
+    0,659.25,0,587.33,523.25,0,440.00,0, 392.00,0,440.00,493.88,587.33,0,0,0,
+    0,783.99,0,659.25,587.33,0,493.88,0, 523.25,0,493.88,440.00,329.63,0,0,0,
+    0,698.46,0,659.25,587.33,0,523.25,0, 493.88,0,523.25,587.33,783.99,0,0,0,
+    659.25,0,587.33,523.25,493.88,0,392.00,0, 440.00,0,493.88,523.25,659.25,0,0,0
+  ],
+  emoArp: [
+    261.63,329.63,440.00,329.63,261.63,329.63,440.00,329.63, 293.66,392.00,493.88,392.00,293.66,392.00,493.88,392.00,
+    246.94,329.63,392.00,329.63,246.94,329.63,392.00,329.63, 261.63,329.63,440.00,329.63,261.63,329.63,440.00,329.63,
+    220.00,293.66,349.23,293.66,220.00,293.66,349.23,293.66, 246.94,293.66,392.00,293.66,246.94,293.66,392.00,293.66,
+    261.63,329.63,392.00,329.63,246.94,293.66,392.00,293.66, 261.63,329.63,440.00,329.63,261.63,329.63,392.00,329.63
+  ],
+  emoBass: [
+    174.61,0,0,0,174.61,0,0,0, 196.00,0,0,0,196.00,0,0,0,
+    164.81,0,0,0,164.81,0,0,0, 110.00,0,0,0,220.00,0,0,0,
+    146.83,0,0,0,146.83,0,0,0, 98.00,0,0,0,196.00,0,0,0,
+    130.81,0,0,0,123.47,0,0,0, 110.00,0,0,0,196.00,0,0,0
+  ],
+
+  init() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = this.enabled ? 1.0 : 0;
+      const comp = this.ctx.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.knee.value = 18; comp.ratio.value = 6;
+      this.bgmFilter = this.ctx.createBiquadFilter();
+      this.bgmFilter.type = 'lowpass'; this.bgmFilter.frequency.value = 1700;
+      this.bgmFilter.connect(this.masterGain);
+      this.masterGain.connect(comp);
+      comp.connect(this.ctx.destination);
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    this.startBGM();
+  },
+
+  toggle() {
+    this.enabled = !this.enabled;
+    this.init();
+    if (this.masterGain) this.masterGain.gain.setValueAtTime(this.enabled ? 1.0 : 0, this.ctx.currentTime);
+    document.getElementById('sound-btn').textContent = this.enabled ? '🔊 音樂/音效：開' : '🔇 音樂/音效：關';
+  },
+
+  setBGM(theme) {
+    if (this.bgmTheme === theme) return;
+    this.bgmTheme = theme;
+    clearTimeout(this.bgmTimer);
+    this.bgmRunning = false;
+    this.bgmStep = 0;
+    if (theme !== 'silent' && this.ctx) this.startBGM();
+  },
+
+  startBGM() {
+    if (this.bgmRunning || !this.ctx || this.bgmTheme === 'silent') return;
+    this.bgmRunning = true;
+    const scheduleNext = () => {
+      if (!this.bgmRunning || this.bgmTheme === 'silent') return;
+      let stepMs = 245;
+      if (this.bgmTheme === 'emotional') {
+        stepMs = 340;
+        if (this.enabled && !document.hidden && this.ctx.state === 'running') {
+          const m = this.emoMelody[this.bgmStep], a = this.emoArp[this.bgmStep], b = this.emoBass[this.bgmStep];
+          if (m > 0) this.playBGMNote(m, 0.90, 'sine', 0.30, this.masterGain);
+          if (a > 0) this.playBGMNote(a, 0.55, 'triangle', 0.14, this.masterGain);
+          if (b > 0) this.playBGMNote(b, 1.25, 'triangle', 0.30, this.masterGain);
+          this.bgmStep = (this.bgmStep + 1) % this.emoMelody.length;
+        }
+      } else {
+        if (this.enabled && !document.hidden && this.ctx.state === 'running') {
+          const mFreq = this.melody[this.bgmStep], bFreq = this.bass[this.bgmStep];
+          if (mFreq > 0) this.playBGMNote(mFreq, 0.26, 'square', 0.24, this.bgmFilter);
+          if (bFreq > 0) this.playBGMNote(bFreq, 0.28, 'triangle', 0.28, this.masterGain);
+          this.bgmStep = (this.bgmStep + 1) % this.melody.length;
+        }
+        if (typeof Game !== 'undefined') {
+          if (['mg1','mg3','mg5','mg7'].includes(Game.mode)) stepMs = 195;
+          else if (Game.mapId === 'sunset') stepMs = 285;
+        }
+      }
+      this.bgmTimer = setTimeout(scheduleNext, stepMs);
+    };
+    scheduleNext();
+  },
+
+  playBGMNote(freq, dur, type, vol, dest) {
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(vol, t + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(gain); gain.connect(dest);
+    osc.start(t); osc.stop(t + dur + 0.03);
+  },
+
+  beep(freq = 440, dur = 0.08, type = 'square', vol = 0.22) {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(gain); gain.connect(this.masterGain || this.ctx.destination);
+    osc.start(t); osc.stop(t + dur);
+  },
+  blip() { this.beep(580, 0.04, 'square', 0.10); },
+  step() { this.beep(180, 0.03, 'triangle', 0.12); },
+  item() { [659, 880, 1175].forEach((f, i) => setTimeout(() => this.beep(f, 0.11, 'triangle', 0.24), i * 80)); },
+  win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.beep(f, 0.12, 'square', 0.22), i * 90)); },
+  fail() { [320, 260, 190].forEach((f, i) => setTimeout(() => this.beep(f, 0.16, 'sawtooth', 0.22), i * 110)); },
+  crash() { this.beep(110, 0.35, 'sawtooth', 0.36); setTimeout(() => this.beep(75, 0.4, 'square', 0.32), 80); }
+};
+
+/* =========================================================
+   2. 像素精靈繪製系統 (16x16 ASCII Sprite Cache)
+========================================================= */
+const Sprites = {};
+function makeSprite(name, rows, palette) {
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 16;
+  const ctx = c.getContext('2d');
+  for (let y = 0; y < 16; y++) {
+    const row = rows[y] || '';
+    for (let x = 0; x < 16; x++) {
+      const ch = row[x];
+      if (ch && ch !== '.' && palette[ch]) {
+        ctx.fillStyle = palette[ch];
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+  Sprites[name] = c;
+}
+
+function initSprites() {
+  makeSprite('player', [
+    '.......BBBB.....','......BRRRRB....','.....BRRRRRRB...','.....BRRRRRRB...',
+    '.BBBBRDDDDDDRR..','BRRRRDDDDDDDDD..','.BBBBFBBFFBBFD..','....FFWBFFWBF...',
+    '.....FFFFFFFF...','...BSSBBBBBBSSB.','..BSSSBSSSSBSSB.','..BFFBSSSSSSBFFB',
+    '..BFFBBBBBBBBFFB','...BBBUBBBBUBBB.','....BTTTBBTTTB..','....BBBB..BBBB..'
+  ], { B:'#111111', R:'#e63946', D:'#a32626', S:'#941f1f', F:'#f3c694', W:'#ffffff', U:'#4e67eb', T:'#5c3324' });
+
+  makeSprite('mystic', [
+    '.....CCCCCC.....','....CCCCCCCC....','...CCDDDDDDCC...','...CDDDDDDDDC...',
+    '....DDWDDWDD....','....DDDDDDDD....','...RRRRRRRRRR...','..RRRGGGGGGGRR..',
+    '..RRGGGGGGGGGR..','..RRGGGGGGGGGR..','...RGGGGGGGGR...','...RRRRRRRRRR...',
+    '....TTTTTTTT....','....TTT..TTT....','...BBBB..BBBB...','................'
+  ], { C:'#5c4d42', D:'#2b221e', W:'#ffe066', R:'#6d597a', G:'#8d7b68', T:'#4a3f35', B:'#261e1b' });
+
+  makeSprite('rider', [
+    '....HHHHHHHH....','...HHHHHHHHHH...','...HHVVVVVVHH...','...HHVVVVVVHH...',
+    '....HHHHHHHH....','...JJJJJJJJJJ...','..JJJYYYYYYJJJ..','..JJJYYYYYYJJJ..',
+    '...JJJJJJJJJJ...','....PPPPPPPP....','....PPP..PPP....','....PPP..PPP...',
+    '....BBB..BBB....','....BBB..BBB....','...KKKK..KKKK...','................'
+  ], { H:'#d62828', V:'#22223b', J:'#2b2d42', Y:'#fcbf49', P:'#3a506b', B:'#1c2541', K:'#111' });
+
+  makeSprite('caretaker', [
+    '.....WWWWWW.....','....WWWWWWWW....','....WFFFFFFW....','....WFEFFEFW....',
+    '.....FFMMFF.....','....MMMMMMMM....','...RRRRRRRRRR...','..RRRYYYYYYRRR..',
+    '..RRRYYYYYYRRR..','...RRRRRRRRRR...','....BBBBBBBB....','....BBB..BBB....',
+    '....BBB..BBB....','....KKK..KKK....','...KKKK..KKKK...','................'
+  ], { W:'#e5e5e5', F:'#f7c59f', E:'#222', M:'#f0f0f0', R:'#9e2a2b', Y:'#e09f3e', B:'#3d2b1f', K:'#111' });
+
+  makeSprite('woman', [
+    '.....HHHHHH.....','....HHHHHHHH....','...HHHFFFFHHH...','...HHFEFFEFHH...',
+    '...HHFFFFFFHH...','...H.DDDDDD.H...','....DDDDDDDD....','...DDDDDDDDDD...',
+    '...DDDDDDDDDD...','....TTTTTTTT....','....TTTTTTTT....','.....FFFFFF.....',
+    '.....FF..FF.....','.....FF..FF.....','....PPP..PPP....','................'
+  ], { H:'#4a2c2a', F:'#ffd6ba', E:'#1b1b1b', D:'#ff758f', T:'#ff4d6d', P:'#c9184a' });
+
+  makeSprite('crate', [
+    '................','.BBBBBBBBBBBBBB.','.BYYYYYYYYYYYYB.','.BYMMMMMMMMMMYB.',
+    '.BYMMBBBBBBMMYB.','.BYMMBYYYYBMMYB.','.BYMMBBBBBBMMYB.','.BYMMMMMMMMMMYB.',
+    '.BYYYYYYYYYYYYB.','.BYMMMMMMMMMMYB.','.BYMMBBBBBBMMYB.','.BYMMMMMMMMMMYB.',
+    '.BYYYYYYYYYYYYB.','.BBBBBBBBBBBBBB.','..KK........KK..','................'
+  ], { B:'#5e3023', Y:'#c08552', M:'#895737', K:'#222' });
+
+  makeSprite('scooter', [
+    '................','.........BBB....','........BBMM....','........BB......',
+    '......RRRRRR....','....RRRRRRRRRR..','...RRRRRRRRRRRR.','..RRRGGGGGGGRRR.',
+    '..RRGGGGGGGGGRR.','....KKKKKKKK....','...KKWKKKKWKK...','...KKWKKKKWKK...',
+    '....KKKKKKKK....','................','................','................'
+  ], { B:'#222', M:'#99e2b4', R:'#e63946', G:'#457b9d', K:'#1d1d1d', W:'#adb5bd' });
+
+  makeSprite('tile', [
+    '................','................','....RRRRRRRR....','...RRRRRRRRRR...',
+    '..RRDDDDDDDDRR..','..RRDDDDDDDDRR..','..RRRRRRRRRRRR..','..RRDDDDDDDDRR..',
+    '..RRRRRRRRRRRR..','................','................','................',
+    '................','................','................','................'
+  ], { R:'#c8553d', D:'#8c2f1b' });
+
+  const dogConfigs = [
+    { id:'dog_target', fur:'#ffffff', shade:'#dcdcdc', collar:'#e63946', floppy:true,  bell:true },
+    { id:'dog_1',      fur:'#ffffff', shade:'#dcdcdc', collar:'#e63946', floppy:true,  bell:false },
+    { id:'dog_2',      fur:'#ffffff', shade:'#dcdcdc', collar:'#e63946', floppy:false, bell:true },
+    { id:'dog_3',      fur:'#f3d5b5', shade:'#d4a373', collar:'#e63946', floppy:true,  bell:true },
+    { id:'dog_4',      fur:'#ffffff', shade:'#dcdcdc', collar:'#3a86ff', floppy:true,  bell:true },
+    { id:'dog_5',      fur:'#ffffff', shade:'#dcdcdc', collar:'#2a9d8f', floppy:true,  bell:true },
+    { id:'dog_6',      fur:'#ced4da', shade:'#adb5bd', collar:'#e63946', floppy:true,  bell:true },
+    { id:'dog_7',      fur:'#ffffff', shade:'#dcdcdc', collar:'#ffbe0b', floppy:true,  bell:false },
+    { id:'dog_8',      fur:'#ffffff', shade:'#dcdcdc', collar:'#e63946', floppy:false, bell:false },
+    { id:'dog_9',      fur:'#ffffff', shade:'#dcdcdc', collar:'#3a86ff', floppy:false, bell:true },
+    { id:'dog_10',     fur:'#bc6c25', shade:'#8b4513', collar:'#e63946', floppy:true,  bell:true },
+    { id:'dog_11',     fur:'#333333', shade:'#1a1a1a', collar:'#ffbe0b', floppy:false, bell:false }
+  ];
+
+  dogConfigs.forEach(cfg => {
+    const headRows = cfg.floppy
+      ? ['....FFFFFFFF....','..FF.FFFFFF.FF..','..FS.FFFFFF.SF..','..SSFEFFFFEFSS..']
+      : ['...F........F...','...FF......FF...','...FFFFFFFFFF...','...FFFEFFFEFF...'];
+    const collarRow = cfg.bell ? '.....CCBBCC.....' : '.....CCCCCC.....';
+    const chestRow  = cfg.bell ? '....FFFBBFFF....' : '....FFFFFFFF....';
+    makeSprite(cfg.id, [
+      '................', ...headRows, '...FFFFNNFFFF...','....FFFFFFFF....',
+      collarRow, chestRow, '...FFFFFFFFFF.F.','...FFFFFFFFFFF..',
+      '...FFSSSSSSFF...','...FF......FF...','...FF......FF...','...SS......SS...','................'
+    ], { F:cfg.fur, S:cfg.shade, C:cfg.collar, B:'#ffb703', E:'#111', N:'#333' });
+  });
+  window.DOG_CONFIGS = dogConfigs;
+}
+
+/* =========================================================
+   3. 題庫系統 (小遊戲 2, 4, 6, 8, 9)
+========================================================= */
+const Quizzes = {
+  mg2: {
+    title: '神秘人士的考驗：臺南地理環境',
+    questions: [
+      { q:'臺南舊城區早期著名的「五條港」地區貿易興盛，當時的船隻主要從哪一片水域進出？', opts:['臺江內海','日月潭','鯉魚潭','澄清湖'], ans:0, exp:'五條港位於昔日臺江內海淤積浮覆地上，是清代府城最重要的商業水道。' },
+      { q:'臺南市西側緊鄰哪一個海域，造就了安平港與觀夕平台的海岸風光？', opts:['太平洋','臺灣海峽','巴士海峽','東海'], ans:1, exp:'臺南西瀕臺灣海峽，黃昏時常能看到落日餘暉映照海面的美景。' },
+      { q:'下列哪一條溪流流經臺南南側，並成為臺南市與高雄市之間的天然界河之一？', opts:['淡水河','濁水溪','二仁溪','高屏溪'], ans:2, exp:'二仁溪流經臺南與高雄交界，見證了南臺灣的地理與生態變遷。' }
+    ]
+  },
+  mg4: {
+    title: '騎士的和解條件：臺南旅遊',
+    questions: [
+      { q:'臺南著名的古蹟百貨「林百貨」頂樓，保存了全臺百貨公司中少見的哪一項歷史設施？', opts:['摩天輪','神社（末廣社）','滑雪道','旋轉餐廳'], ans:1, exp:'林百貨頂樓設有「末廣社」神社，至今仍是旅客必訪的文化地標。' },
+      { q:'位於臺南七股區，以潔白鹽晶堆疊成小山丘而聞名的熱門觀光景點是？', opts:['七股鹽山','關子嶺泥漿','玉井芒果山','梅嶺花海'], ans:0, exp:'七股鹽山過去曾是臺灣重要的曬鹽場，如今轉型為極具代表性的觀光景點。' },
+      { q:'擁有「全臺首學」美稱的臺南孔廟，最早是在哪一個歷史時期興建的？', opts:['荷蘭時期','明鄭時期','清領晚期','日治時期'], ans:1, exp:'臺南孔廟建於 1665 年明鄭時期，由陳永華倡議興建，是臺灣歷史最悠久的孔廟。' }
+    ]
+  },
+  mg6: {
+    title: '廟公的考驗：臺南廟宇宗教',
+    questions: [
+      { q:'昔日稱作「北勢街」的神農街，其現代街名正是源自街底的哪一座府城古廟？', opts:['大天后宮','開基藥王廟','祀典武廟','開元寺'], ans:1, exp:'神農街尾即是全臺藥王廟的開基祖廟「藥王廟」，因主祀藥王大帝（神農大帝）而得名。' },
+      { q:'臺南開基藥王廟在建築朝向上相當獨特，屬於府城「五馬朝江一回頭」中的哪一種特殊方位？', opts:['坐西朝東','建於木筏上','沒有屋頂','面向北方海洋'], ans:0, exp:'有別於多數廟宇坐北朝南，藥王廟「坐西朝東」象徵迎向陽光與生命力。' },
+      { q:'府城傳統「七寺八廟」文化深厚，其中「臺灣首廟天壇」主要祭祀哪一位神明？', opts:['媽祖','關聖帝君','玉皇上帝（天公）','保生大帝'], ans:2, exp:'臺灣首廟天壇是府城著名的天公廟，主祀玉皇上帝，承載百年信仰文化。' }
+    ]
+  },
+  mg8: {
+    title: '小狗主人的考驗：臺南美食',
+    questions: [
+      { q:'臺南經典小吃「棺材板」，外層酥脆的盒狀餅皮是用哪一種食材油炸後挖空製成？', opts:['厚片吐司','蔥油餅','刈包外皮','燒餅'], ans:0, exp:'棺材板以厚片吐司油炸後挖空，填入雞肝或海鮮濃湯內餡，是獨特的府城美味。' },
+      { q:'臺南清燙牛肉湯講究極致鮮甜，通常堅持選用哪一種牛肉直接以滾燙高湯沖淋？', opts:['冷凍和牛','當日現宰溫體牛肉','煙燻牛肉乾','醃漬牛排'], ans:1, exp:'鄰近善化牛墟的地利之便，讓臺南得以享用到現宰直送的新鮮溫體牛肉湯。' },
+      { q:'安平老街一帶最著名、常以鮮蝦漿製成香脆薄片的經典伴手禮是？', opts:['太陽餅','蝦餅','方塊酥','牛舌餅'], ans:1, exp:'安平蝦餅口感酥脆、蝦味濃厚，是來安平旅遊人手一包的代表性點心。' }
+    ]
+  },
+  mg9: {
+    title: '最後的考驗：臺南火車站的記憶',
+    questions: [
+      { q:'身為國定古蹟的第二代「臺南舊火車站」，現今所見的鋼筋混凝土站體是在西元哪一年改建落成？', opts:['1900 年','1936 年','1965 年','1998 年'], ans:1, exp:'初代木造車站建於 1900 年，而現今的折衷主義二層樓車站於 1936 年落成啟用。' },
+      { q:'1936 年落成的臺南舊火車站由建築師宇敷赳夫設計，二樓曾設有日治時期全臺車站中極罕見的什麼設施？', opts:['鐵道旅館與餐廳','室內游泳池','電影放映廳','天文觀測台'], ans:0, exp:'臺南車站二樓曾設有極為氣派的鐵道飯店與餐廳，是當時臺灣車站建築中的獨特存在。' },
+      { q:'隨著臺南鐵路地下化轉入新站體，歷經近一世紀風華的國定古蹟舊車站將會如何延續生命？', opts:['完全拆除蓋商場','移往外縣市','作為文化資產保存修復並融入新站景觀','封閉不再開放'], ans:2, exp:'新臺南車站以低調的飄浮屋頂烘托舊站天際線，讓國定古蹟得以修復並繼續守護府城。' }
+    ]
+  }
+};
+
+const QuizRunner = {
+  key: null, idx: 0, onSuccess: null, locked: false,
+  start(key, onSuccess) {
+    Input.resetKeys();
+    this.key = key; this.idx = 0; this.onSuccess = onSuccess;
+    MinigameMgr.current = null;
+    Game.mode = 'quiz';
+    MinigameMgr.updateSkipButtons();
+    document.getElementById('quiz-overlay').classList.remove('hidden');
+    this.render();
+  },
+  render() {
+    this.locked = false;
+    const quiz = Quizzes[this.key], item = quiz.questions[this.idx];
+    document.getElementById('quiz-title').textContent = quiz.title;
+    document.getElementById('quiz-progress').textContent = `第 ${this.idx + 1} / ${quiz.questions.length} 題`;
+    document.getElementById('quiz-q-text').textContent = item.q;
+    document.getElementById('quiz-fb').classList.add('hidden');
+    document.getElementById('quiz-next-btn').classList.add('hidden');
+    const box = document.getElementById('quiz-opts');
+    box.innerHTML = '';
+    ['A','B','C','D'].forEach((lbl, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'quiz-opt';
+      btn.textContent = `${lbl}. ${item.opts[i]}`;
+      btn.onclick = () => this.answer(i, btn);
+      box.appendChild(btn);
+    });
+  },
+  answer(choice, btn) {
+    if (this.locked) return;
+    this.locked = true;
+    const quiz = Quizzes[this.key], item = quiz.questions[this.idx];
+    const btns = document.querySelectorAll('.quiz-opt');
+    btns.forEach(b => b.disabled = true);
+    const fb = document.getElementById('quiz-fb');
+    fb.classList.remove('hidden');
+    const nextBtn = document.getElementById('quiz-next-btn');
+    if (choice === item.ans) {
+      AudioFX.win(); btn.classList.add('correct');
+      fb.innerHTML = `<strong style="color:#52b788">✔ 答對了！</strong> ${item.exp}`;
+      nextBtn.textContent = (this.idx + 1 < quiz.questions.length) ? '下一題 ▶' : '完成考驗 ✔';
+      nextBtn.onclick = () => this.next();
+    } else {
+      AudioFX.fail(); btn.classList.add('wrong'); btns[item.ans].classList.add('correct');
+      fb.innerHTML = `<strong style="color:#ff6b6b">✘ 答錯囉！</strong> 正確答案是：${item.opts[item.ans]}。<br>${item.exp}`;
+      nextBtn.textContent = '↻ 重新挑戰此關問答';
+      nextBtn.onclick = () => { this.idx = 0; this.render(); };
+    }
+    nextBtn.classList.remove('hidden');
+  },
+  next() {
+    const quiz = Quizzes[this.key];
+    this.idx++;
+    if (this.idx < quiz.questions.length) this.render();
+    else {
+      document.getElementById('quiz-overlay').classList.add('hidden');
+      Game.mode = 'rpg';
+      if (this.onSuccess) { const cb = this.onSuccess; this.onSuccess = null; cb(); }
+    }
+  }
+};
+
+/* =========================================================
+   4. 對話系統（含像素頭像、旁白模式與觸發事件）
+========================================================= */
+const Dialogue = {
+  queue: [], curIndex: 0, charIndex: 0, timer: null, onDone: null, active: false,
+  show(lines, onDone = null) {
+    Input.resetKeys();
+    this.queue = lines; this.curIndex = 0; this.onDone = onDone; this.active = true;
+    Game.mode = 'dialogue';
+    document.getElementById('dialogue-box').classList.remove('hidden');
+    this.typeCurrent();
+  },
+  drawPortrait(who) {
+    const c = document.getElementById('speaker-portrait'), nameBadge = document.getElementById('speaker-name');
+    if (who === '旁白') { c.style.display = 'none'; nameBadge.style.background = '#4ecdc4'; return; }
+    c.style.display = 'block'; nameBadge.style.background = 'var(--border-mid)';
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, 48, 48);
+    let key = 'player';
+    if (who.includes('神祕') || who.includes('舊火車站')) key = 'mystic';
+    else if (who.includes('騎士')) key = 'rider';
+    else if (who.includes('廟公')) key = 'caretaker';
+    else if (who.includes('女子')) key = 'woman';
+    if (Sprites[key]) ctx.drawImage(Sprites[key], 4, 4, 40, 40);
+  },
+  typeCurrent() {
+    clearInterval(this.timer);
+    const entry = this.queue[this.curIndex];
+    if (entry.onShow) entry.onShow();
+    document.getElementById('speaker-name').textContent = entry.who;
+    this.drawPortrait(entry.who);
+    const el = document.getElementById('dialogue-text');
+    el.textContent = ''; this.charIndex = 0;
+    this.timer = setInterval(() => {
+      if (this.charIndex < entry.text.length) {
+        el.textContent += entry.text[this.charIndex++];
+        if (this.charIndex % 3 === 0) AudioFX.blip();
+      } else clearInterval(this.timer);
+    }, 22);
+  },
+  advance() {
+    if (!this.active) return;
+    const entry = this.queue[this.curIndex], el = document.getElementById('dialogue-text');
+    if (this.charIndex < entry.text.length) {
+      clearInterval(this.timer); el.textContent = entry.text; this.charIndex = entry.text.length; return;
+    }
+    this.curIndex++;
+    if (this.curIndex < this.queue.length) this.typeCurrent();
+    else {
+      clearInterval(this.timer); this.active = false;
+      document.getElementById('dialogue-box').classList.add('hidden');
+      Game.mode = 'rpg';
+      if (this.onDone) { const cb = this.onDone; this.onDone = null; cb(); }
+    }
+  }
+};
+
+/* =========================================================
+   5. 小遊戲管理與 4 個動作小遊戲 (MG1, MG3, MG5, MG7)
+========================================================= */
+const MinigameMgr = {
+  current: null,
+  skipsLeft: 3,
+
+  updateSkipButtons() {
+    const hasSkip = this.skipsLeft > 0;
+    const countText = this.skipsLeft === Infinity ? '∞' : this.skipsLeft;
+    const mgBtn = document.getElementById('mg-skip-btn');
+    if (mgBtn) {
+      const txt = hasSkip ? `⏭ 跳過 (${countText})` : '⏭ 跳過 (0)';
+      if (mgBtn.textContent !== txt) mgBtn.textContent = txt;
+      mgBtn.disabled = !hasSkip; mgBtn.style.opacity = hasSkip ? '1' : '0.45';
+    }
+    const qBtn = document.getElementById('quiz-skip-btn');
+    if (qBtn) {
+      const txt = hasSkip ? `⏭ 跳過此關 (剩 ${countText} 次)` : '⏭ 跳過次數已用完';
+      if (qBtn.textContent !== txt) qBtn.textContent = txt;
+      qBtn.disabled = !hasSkip; qBtn.style.opacity = hasSkip ? '1' : '0.45';
+    }
+    const rBtn = document.getElementById('res-skip-btn');
+    if (rBtn) {
+      rBtn.classList.toggle('hidden', !hasSkip);
+      if (hasSkip) rBtn.textContent = `⏭ 跳過此關 (剩 ${countText} 次)`;
+    }
+  },
+
+  skipCurrent() {
+    if (this.skipsLeft <= 0) return;
+    if (this.skipsLeft !== Infinity) this.skipsLeft--;
+    Input.resetKeys(); AudioFX.blip();
+    document.getElementById('result-overlay').classList.add('hidden');
+    document.getElementById('dog-overlay').classList.add('hidden');
+
+    if (Game.mode === 'quiz') {
+      document.getElementById('quiz-overlay').classList.add('hidden');
+      Game.mode = 'rpg'; this.updateSkipButtons();
+      if (QuizRunner.onSuccess) { const cb = QuizRunner.onSuccess; QuizRunner.onSuccess = null; cb(); }
+      return;
+    }
+
+    const cur = this.current;
+    this.current = null; this.setHud(false); this.updateSkipButtons();
+    Game.mode = 'rpg';
+    if (cur === 'mg1') { Game.flags.mg1Done = true; Game.triggerAfterMG1(); }
+    else if (cur === 'mg3') { MG3.crashPhase = 0; Game.flags.mg3Done = true; Game.triggerAfterMG3(); }
+    else if (cur === 'mg5') { Game.flags.mg5Done = true; Game.triggerAfterMG5(); }
+    else if (cur === 'mg7') { Game.flags.mg7Done = true; Game.triggerAfterMG7(); }
+  },
+
+  showResult(win, title, msg, btnLabel, cb) {
+    Input.resetKeys();
+    const ov = document.getElementById('result-overlay');
+    document.getElementById('res-title').textContent = title;
+    document.getElementById('res-title').style.color = win ? '#52b788' : '#ff6b6b';
+    document.getElementById('res-msg').textContent = msg;
+    const btn = document.getElementById('res-btn');
+    btn.textContent = btnLabel;
+    btn.onclick = () => { ov.classList.add('hidden'); cb(); };
+    this.updateSkipButtons();
+    ov.classList.remove('hidden');
+  },
+
+  restartCurrent() {
+    if (this.current === 'mg1') MG1.start();
+    if (this.current === 'mg3') MG3.start();
+    if (this.current === 'mg5') MG5.start();
+    if (this.current === 'mg7') MG7.start();
+  },
+
+  setHud(visible, text = '') {
+    const hud = document.getElementById('mg-hud'), undoBtn = document.getElementById('mg-undo-btn');
+    if (visible) {
+      hud.classList.remove('hidden');
+      const statusEl = document.getElementById('mg-status');
+      if (statusEl.textContent !== text) statusEl.textContent = text;
+      undoBtn.classList.toggle('hidden', this.current !== 'mg1');
+      this.updateSkipButtons();
+    } else {
+      hud.classList.add('hidden'); undoBtn.classList.add('hidden');
+    }
+  }
+};
+
+/* --- 小遊戲 1：進階推箱子 (4箱困難版) --- */
+const MG1 = {
+  grid: [], player: { x:1, y:6 },
+  targets: [{ x:7, y:2 }, { x:7, y:3 }, { x:7, y:4 }, { x:8, y:3 }],
+  boxes: [], history: [], moves: 0, maxMoves: 150, moveCooldown: 0,
+
+  start() {
+    Input.resetKeys(); MinigameMgr.current = 'mg1'; Game.mode = 'mg1';
+    this.grid = ['##########','#....#...#','#....#...#','#....#...#','#.#......#','#....#...#','#........#','##########'];
+    this.player = { x:1, y:6 };
+    this.boxes = [{ x:2, y:2 }, { x:3, y:2 }, { x:3, y:4 }, { x:2, y:5 }];
+    this.history = []; this.moves = 0; this.moveCooldown = 0;
+    this.updateHud();
+  },
+  updateHud() {
+    MinigameMgr.setHud(true, `推箱子(困難)：4箱推至X ｜ 剩餘 ${this.maxMoves - this.moves} 步`);
+  },
+  undo() {
+    if (Game.mode !== 'mg1' || this.history.length === 0) return;
+    const prev = this.history.pop();
+    this.player.x = prev.px; this.player.y = prev.py; this.boxes = prev.boxes; this.moves = prev.moves;
+    AudioFX.blip(); this.updateHud();
+  },
+  tryMove(dx, dy) {
+    if (this.moveCooldown > 0) return;
+    const nx = this.player.x + dx, ny = this.player.y + dy;
+    if (this.grid[ny][nx] === '#') return;
+    const bIdx = this.boxes.findIndex(b => b.x === nx && b.y === ny);
+    let pushed = false;
+    if (bIdx !== -1) {
+      const bx = nx + dx, by = ny + dy;
+      if (this.grid[by][bx] === '#' || this.boxes.some(b => b.x === bx && b.y === by)) return;
+      pushed = true;
+    }
+    this.history.push({ px:this.player.x, py:this.player.y, boxes:this.boxes.map(b => ({x:b.x, y:b.y})), moves:this.moves });
+    if (pushed) { this.boxes[bIdx].x = nx + dx; this.boxes[bIdx].y = ny + dy; }
+    this.player.x = nx; this.player.y = ny; this.moves++;
+    AudioFX.step(); this.moveCooldown = 18; this.updateHud();
+
+    if (this.targets.every(t => this.boxes.some(b => b.x === t.x && b.y === t.y))) {
+      AudioFX.win(); MinigameMgr.current = null; MinigameMgr.setHud(false);
+      Game.mode = 'rpg'; Game.flags.mg1Done = true; Game.triggerAfterMG1(); return;
+    }
+    if (this.moves >= this.maxMoves) {
+      AudioFX.fail(); Game.mode = 'paused';
+      MinigameMgr.showResult(false, '體力耗盡了！', `超過 ${this.maxMoves} 步還沒將廢紙箱整理完，再重新規劃路線吧！`, '↻ 重新挑戰', () => MG1.start());
+    }
+  },
+  update() {
+    const moving = Input.keys.up || Input.keys.down || Input.keys.left || Input.keys.right;
+    if (!moving) { this.moveCooldown = 0; return; }
+    if (this.moveCooldown > 0) { this.moveCooldown--; return; }
+    if (Input.keys.up) this.tryMove(0, -1);
+    else if (Input.keys.down) this.tryMove(0, 1);
+    else if (Input.keys.left) this.tryMove(-1, 0);
+    else if (Input.keys.right) this.tryMove(1, 0);
+  },
+  draw(ctx) {
+    ctx.fillStyle = '#251e34'; ctx.fillRect(0, 0, 512, 384);
+    const ts = 38, ox = (512 - 10 * ts) / 2, oy = (384 - 8 * ts) / 2 + 18;
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 10; x++) {
+        const px = ox + x * ts, py = oy + y * ts;
+        if (this.grid[y][x] === '#') {
+          ctx.fillStyle = '#6b4f3b'; ctx.fillRect(px, py, ts, ts);
+          ctx.fillStyle = '#4a3525'; ctx.fillRect(px + 2, py + ts - 6, ts - 4, 4);
+          ctx.strokeStyle = '#36261a'; ctx.strokeRect(px + 1, py + 1, ts - 2, ts - 2);
+        } else {
+          ctx.fillStyle = (x + y) % 2 === 0 ? '#e3d9c6' : '#d5c9b2';
+          ctx.fillRect(px, py, ts, ts);
+        }
+      }
+    }
+    this.targets.forEach(t => {
+      const px = ox + t.x * ts, py = oy + t.y * ts;
+      ctx.fillStyle = 'rgba(244, 211, 94, 0.45)'; ctx.fillRect(px + 4, py + 4, ts - 8, ts - 8);
+      ctx.strokeStyle = '#e07a5f'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(px + 9, py + 9); ctx.lineTo(px + ts - 9, py + ts - 9);
+      ctx.moveTo(px + ts - 9, py + 9); ctx.lineTo(px + 9, py + ts - 9); ctx.stroke(); ctx.lineWidth = 1;
+    });
+    this.boxes.forEach(b => {
+      const onT = this.targets.some(t => t.x === b.x && t.y === b.y);
+      ctx.drawImage(Sprites.crate, ox + b.x * ts + 2, oy + b.y * ts + 2, ts - 4, ts - 4);
+      if (onT) { ctx.strokeStyle = '#52b788'; ctx.lineWidth = 3; ctx.strokeRect(ox + b.x * ts + 2, oy + b.y * ts + 2, ts - 4, ts - 4); ctx.lineWidth = 1; }
+    });
+    ctx.drawImage(Sprites.player, ox + this.player.x * ts + 2, oy + this.player.y * ts + 2, ts - 4, ts - 4);
+  }
+};
+
+/* --- 小遊戲 3：圓環騎機車閃避 --- */
+const MG3 = {
+  lane: 1, laneCooldown: 0, hp: 3, progress: 0, maxProgress: 1200,
+  obstacles: [], spawnTimer: 0, crashPhase: 0, crashRiderX: 540, invuln: 0,
+
+  start() {
+    Input.resetKeys(); MinigameMgr.current = 'mg3'; Game.mode = 'mg3';
+    this.lane = 1; this.hp = 3; this.progress = 0; this.obstacles = [];
+    this.spawnTimer = 40; this.crashPhase = 0; this.crashRiderX = 540; this.invuln = 0;
+    MinigameMgr.setHud(true, '圓環騎車：上下鍵切換車道！ HP: ♥♥♥');
+  },
+  update() {
+    if (this.laneCooldown > 0) this.laneCooldown--;
+    if (this.invuln > 0) this.invuln--;
+    if (this.crashPhase === 0) {
+      if (Input.keys.up && this.lane > 0 && this.laneCooldown === 0) { this.lane--; this.laneCooldown = 12; AudioFX.step(); }
+      else if (Input.keys.down && this.lane < 2 && this.laneCooldown === 0) { this.lane++; this.laneCooldown = 12; AudioFX.step(); }
+      this.progress++;
+      const pct = Math.min(100, Math.floor((this.progress / this.maxProgress) * 100));
+      MinigameMgr.setHud(true, `圓環騎車進度：${pct}% ｜ HP: ${'♥'.repeat(this.hp) + '♡'.repeat(3 - this.hp)}`);
+      this.spawnTimer--;
+      if (this.spawnTimer <= 0 && this.progress < this.maxProgress - 90) {
+        this.obstacles.push({ x: 530, lane: Math.floor(Math.random() * 3), type: Math.random() > 0.5 ? 'cone' : 'hole' });
+        this.spawnTimer = 48 + Math.floor(Math.random() * 26);
+      }
+      for (let i = this.obstacles.length - 1; i >= 0; i--) {
+        const o = this.obstacles[i]; o.x -= 3.2;
+        if (o.x < 98 && o.x > 54 && o.lane === this.lane && this.invuln === 0) {
+          this.hp--; this.invuln = 55; AudioFX.fail(); this.obstacles.splice(i, 1);
+          if (this.hp <= 0) {
+            Game.mode = 'paused';
+            MinigameMgr.showResult(false, '機車拋錨了！', '還沒繞完圓環就撞到太多障礙物，再試一次吧！', '↻ 重新騎車', () => MG3.start());
+            return;
+          }
+          continue;
+        }
+        if (o.x < -40) this.obstacles.splice(i, 1);
+      }
+      if (this.progress >= this.maxProgress) { this.crashPhase = 1; this.obstacles = []; }
+    } else if (this.crashPhase === 1) {
+      this.crashRiderX -= 8.5;
+      if (this.crashRiderX <= 98) {
+        AudioFX.crash(); Game.shakeTimer = 18;
+        MinigameMgr.current = null; MinigameMgr.setHud(false);
+        Game.mode = 'rpg'; Game.flags.mg3Done = true; Game.triggerAfterMG3();
+      }
+    }
+  },
+  draw(ctx) {
+    ctx.fillStyle = '#2d6a4f'; ctx.fillRect(0, 0, 512, 384);
+    ctx.fillStyle = '#40916c'; ctx.fillRect(0, 88, 512, 24); ctx.fillRect(0, 310, 512, 24);
+    const treeOff = (this.progress * 3.2) % 128;
+    for (let tx = -treeOff; tx < 560; tx += 128) {
+      ctx.fillStyle = '#1b4332'; ctx.beginPath(); ctx.arc(tx, 76, 18, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e63946'; ctx.fillRect(tx - 6, 70, 5, 4); ctx.fillRect(tx + 4, 74, 4, 4);
+      ctx.fillStyle = '#2b2d42'; ctx.fillRect(tx + 60, 74, 4, 34);
+      ctx.fillStyle = '#ffd166'; ctx.fillRect(tx + 58, 70, 8, 5);
+    }
+    ctx.fillStyle = '#495057'; ctx.fillRect(0, 120, 512, 180);
+    const offset = (this.progress * 3.2) % 40;
+    ctx.fillStyle = '#f8f9fa';
+    for (let x = -offset; x < 512; x += 40) { ctx.fillRect(x, 178, 22, 4); ctx.fillRect(x, 238, 22, 4); }
+    for (let rx = -offset; rx < 540; rx += 40) {
+      ctx.fillStyle = '#e63946'; ctx.fillRect(rx, 114, 20, 6); ctx.fillRect(rx, 300, 20, 6);
+      ctx.fillStyle = '#f8f9fa'; ctx.fillRect(rx + 20, 114, 20, 6); ctx.fillRect(rx + 20, 300, 20, 6);
+    }
+    const laneY = [132, 192, 252];
+    this.obstacles.forEach(o => {
+      const y = laneY[o.lane];
+      if (o.type === 'cone') {
+        ctx.fillStyle = '#333'; ctx.fillRect(o.x + 4, y + 26, 24, 5);
+        ctx.fillStyle = '#ff7b00'; ctx.fillRect(o.x + 8, y + 6, 16, 20);
+        ctx.fillStyle = '#fff'; ctx.fillRect(o.x + 10, y + 13, 12, 5);
+      } else {
+        ctx.fillStyle = '#212529'; ctx.beginPath(); ctx.ellipse(o.x + 16, y + 20, 15, 9, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#6c757d'; ctx.strokeRect(o.x + 4, y + 14, 24, 12);
+      }
+    });
+    if (this.invuln % 6 < 4) { ctx.drawImage(Sprites.scooter, 56, laneY[this.lane] - 4, 44, 44); ctx.drawImage(Sprites.player, 62, laneY[this.lane] - 14, 32, 32); }
+    if (this.crashPhase === 1) {
+      ctx.save(); ctx.translate(this.crashRiderX + 44, laneY[this.lane] - 4); ctx.scale(-1, 1);
+      ctx.drawImage(Sprites.scooter, 0, 0, 44, 44); ctx.drawImage(Sprites.rider, 6, -10, 32, 32); ctx.restore();
+      ctx.fillStyle = '#ffbe0b'; ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('靠杯！！', this.crashRiderX - 10, laneY[this.lane] - 18);
+    }
+  }
+};
+
+/* --- 小遊戲 5：接瓦片修廟 --- */
+const MG5 = {
+  px: 230, caught: 0, goal: 12, timer: 30 * 60, items: [], spawnTimer: 0,
+  start() {
+    Input.resetKeys(); MinigameMgr.current = 'mg5'; Game.mode = 'mg5';
+    this.px = 230; this.caught = 0; this.timer = 30 * 60; this.items = []; this.spawnTimer = 15;
+    MinigameMgr.setHud(true, '左右移動接住屋頂瓦片！進度：0 / 12');
+  },
+  update() {
+    if (Input.keys.left) this.px -= 6;
+    if (Input.keys.right) this.px += 6;
+    this.px = Math.max(16, Math.min(512 - 56, this.px));
+    this.timer--;
+    if (this.timer <= 0) {
+      Game.mode = 'paused'; AudioFX.fail();
+      MinigameMgr.showResult(false, '時間到了！', `還差 ${this.goal - this.caught} 片瓦片才能修好屋頂，再試一次吧！`, '↻ 重新接瓦片', () => MG5.start());
+      return;
+    }
+    this.spawnTimer--;
+    if (this.spawnTimer <= 0) {
+      this.items.push({ x: 24 + Math.random() * (512 - 64), y: -24, vy: 1.6 + Math.random() * 1.1, bad: Math.random() < 0.22 });
+      this.spawnTimer = 24 + Math.floor(Math.random() * 14);
+    }
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const it = this.items[i]; it.y += it.vy;
+      if (it.y > 310 && it.y < 355 && it.x + 24 > this.px && it.x < this.px + 40) {
+        if (it.bad) { AudioFX.fail(); this.caught = Math.max(0, this.caught - 1); }
+        else { AudioFX.beep(740, 0.06, 'square', 0.20); this.caught++; }
+        this.items.splice(i, 1);
+        if (this.caught >= this.goal) {
+          AudioFX.win(); MinigameMgr.current = null; MinigameMgr.setHud(false);
+          Game.mode = 'rpg'; Game.flags.mg5Done = true; Game.triggerAfterMG5(); return;
+        }
+        continue;
+      }
+      if (it.y > 390) this.items.splice(i, 1);
+    }
+    MinigameMgr.setHud(true, `接瓦片：${this.caught}/${this.goal} (避開灰石) ｜ ${Math.ceil(this.timer / 60)}秒`);
+  },
+  draw(ctx) {
+    ctx.fillStyle = '#1b1626'; ctx.fillRect(0, 0, 512, 384);
+    ctx.fillStyle = '#ffe066';
+    [[60,56],[150,46],[360,52],[460,62]].forEach(([sx,sy]) => ctx.fillRect(sx, sy, 3, 3));
+    ctx.fillStyle = '#6b2d2c'; ctx.fillRect(36, 72, 440, 260);
+    ctx.fillStyle = '#9e2a2b'; ctx.fillRect(24, 62, 464, 18);
+    [60, 160, 336, 436].forEach(px => {
+      ctx.fillStyle = '#b5171e'; ctx.fillRect(px, 80, 16, 250);
+      ctx.fillStyle = '#adb5bd'; ctx.fillRect(px - 2, 318, 20, 12);
+    });
+    ctx.fillStyle = '#4a1818'; ctx.fillRect(204, 136, 104, 194);
+    ctx.fillStyle = '#ffd166';
+    for (let dy = 160; dy < 300; dy += 36) { ctx.fillRect(226, dy, 5, 5); ctx.fillRect(280, dy, 5, 5); }
+    ctx.fillStyle = '#6c757d'; ctx.fillRect(0, 330, 512, 54);
+    this.items.forEach(it => {
+      if (it.bad) {
+        ctx.fillStyle = '#6c757d'; ctx.beginPath(); ctx.arc(it.x + 14, it.y + 14, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#adb5bd'; ctx.fillRect(it.x + 8, it.y + 8, 6, 6);
+      } else ctx.drawImage(Sprites.tile, it.x, it.y, 32, 32);
+    });
+    ctx.drawImage(Sprites.player, this.px + 4, 316, 36, 36);
+    ctx.fillStyle = '#dda15e'; ctx.fillRect(this.px - 4, 312, 48, 10);
+    ctx.strokeStyle = '#6c4623'; ctx.strokeRect(this.px - 4, 312, 48, 10);
+  }
+};
+
+/* --- 小遊戲 7：安平老街找小狗 (12隻動態辨認) --- */
+const MG7 = {
+  dogs: [], px: 240, py: 320, inspected: null, timer: 35 * 60,
+  start() {
+    Input.resetKeys(); MinigameMgr.current = 'mg7'; Game.mode = 'mg7';
+    this.px = 240; this.py = 326; this.inspected = null; this.timer = 35 * 60;
+    const shuffled = [...window.DOG_CONFIGS].sort(() => Math.random() - 0.5);
+    this.dogs = shuffled.map((cfg, i) => {
+     const angle = Math.random() * Math.PI * 2, spd = 0.35 + Math.random() * 0.4;
+      return {
+        ...cfg, x: 40 + (i % 4) * 115 + (Math.random() * 30 - 15),
+        y: 92 + Math.floor(i / 4) * 76 + (Math.random() * 24 - 12),
+        vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd,
+        facing: Math.cos(angle) >= 0 ? 1 : -1, dirTimer: 35 + Math.floor(Math.random() * 65), bobOffset: Math.random() * 10
+      };
+    });
+    MinigameMgr.setHud(true, '目標：純白毛・垂耳・紅項圈・金鈴鐺 ｜ 35秒');
+  },
+  update() {
+    const spd = 3.4;
+    if (Input.keys.up) this.py -= spd;
+    if (Input.keys.down) this.py += spd;
+    if (Input.keys.left) this.px -= spd;
+    if (Input.keys.right) this.px += spd;
+    this.px = Math.max(16, Math.min(464, this.px));
+    this.py = Math.max(76, Math.min(340, this.py));
+    this.dogs.forEach(d => {
+      d.dirTimer--;
+      if (d.dirTimer <= 0) {
+        // 35% 機率停下來休息，方便玩家觀察或點擊
+        if (Math.random() < 0.35) {
+          d.vx = 0; d.vy = 0;
+          d.dirTimer = 45 + Math.floor(Math.random() * 50);
+        } else {
+          // 移動速度大幅放慢為 0.35 ~ 0.75（想更慢可改成 0.25 + Math.random() * 0.3）
+          const angle = Math.random() * Math.PI * 2, mspd = 0.35 + Math.random() * 0.4;
+          d.vx = Math.cos(angle) * mspd;
+          d.vy = Math.sin(angle) * mspd;
+          if (Math.abs(d.vx) > 0.05) d.facing = d.vx > 0 ? 1 : -1;
+          d.dirTimer = 60 + Math.floor(Math.random() * 80);
+        }
+      }
+      d.x += d.vx; d.y += d.vy;
+      if (d.x < 20 || d.x > 452) { d.vx *= -1; d.x = Math.max(20, Math.min(452, d.x)); d.facing = d.vx > 0 ? 1 : -1; }
+      if (d.y < 82 || d.y > 326) { d.vy *= -1; d.y = Math.max(82, Math.min(326, d.y)); }
+    });
+    this.timer--;
+    MinigameMgr.setHud(true, `找肉燥：純白毛・垂耳・紅項圈・金鈴鐺 ｜ ${Math.ceil(this.timer / 60)}秒`);
+    if (this.timer <= 0) {
+      Game.mode = 'paused'; AudioFX.fail();
+      MinigameMgr.showResult(false, '時間到了！', '天色暗下來了，還是沒能找回「肉燥」，重新再找一次吧！', '↻ 重新尋找', () => MG7.start());
+    }
+  },
+  inspectNear() {
+    let closest = null, bestD = 54;
+    this.dogs.forEach(d => { const dist = Math.hypot(d.x - this.px, d.y - this.py); if (dist < bestD) { bestD = dist; closest = d; } });
+    if (closest) this.openInspect(closest);
+  },
+  handleCanvasClick(cx, cy) {
+    if (Game.mode !== 'mg7') return;
+    const hits = this.dogs.filter(d => cx >= d.x - 6 && cx <= d.x + 46 && cy >= d.y - 6 && cy <= d.y + 46);
+    if (hits.length > 0) { hits.sort((a, b) => b.y - a.y); this.openInspect(hits[0]); }
+  },
+  openInspect(dog) {
+    Input.resetKeys(); AudioFX.blip(); this.inspected = dog;
+    const prev = document.getElementById('dog-preview'), pctx = prev.getContext('2d');
+    pctx.imageSmoothingEnabled = false; pctx.clearRect(0, 0, 64, 64);
+    pctx.drawImage(Sprites[dog.id], 4, 4, 56, 56);
+    document.getElementById('dog-desc').innerHTML = '「汪！汪汪！」<br><span style="font-size:13px; color:#ffd166;">請仔細對照上方的像素特寫（毛色、耳朵、項圈、鈴鐺），確定這隻是「肉燥」嗎？</span>';
+    document.getElementById('dog-overlay').classList.remove('hidden');
+    Game.mode = 'paused';
+  },
+  closeInspect() { document.getElementById('dog-overlay').classList.add('hidden'); Game.mode = 'mg7'; },
+  chooseDog() {
+    document.getElementById('dog-overlay').classList.add('hidden');
+    if (this.inspected.id === 'dog_target') {
+      AudioFX.win(); MinigameMgr.current = null; MinigameMgr.setHud(false);
+      Game.mode = 'rpg'; Game.flags.mg7Done = true; Game.triggerAfterMG7();
+    } else {
+      AudioFX.fail();
+      MinigameMgr.showResult(false, '認錯隻了！', '這隻並不是「肉燥」（請確認：純白毛、垂耳朵、紅項圈、金色鈴鐺）！小狗們都散開了，重新尋找吧！', '↻ 重新尋找', () => MG7.start());
+    }
+  },
+  draw(ctx) {
+    ctx.fillStyle = '#e2b879'; ctx.fillRect(0, 0, 512, 384);
+    for (let y = 70; y < 384; y += 28) {
+      for (let x = 0; x < 512; x += 36) {
+        ctx.fillStyle = ((x / 36 + y / 28) % 2 === 0) ? '#d9ab6c' : '#e6be83';
+        ctx.fillRect(x + 1, y + 1, 34, 26);
+      }
+    }
+    ctx.fillStyle = '#7f5539'; ctx.fillRect(0, 0, 512, 68);
+    ctx.fillStyle = '#5c3a21'; ctx.fillRect(0, 42, 512, 6);
+    for (let x = 0; x < 512; x += 48) {
+      ctx.fillStyle = (x / 48) % 2 === 0 ? '#e63946' : '#f1faee';
+      ctx.fillRect(x, 48, 48, 22);
+      ctx.fillStyle = '#d62828'; ctx.fillRect(x + 20, 68, 8, 10);
+    }
+    const t = Date.now() / 160;
+    const actors = [...this.dogs.map(d => ({ kind:'dog', y:d.y, ref:d })), { kind:'player', y:this.py }].sort((a, b) => a.y - b.y);
+    actors.forEach(a => {
+      if (a.kind === 'player') ctx.drawImage(Sprites.player, this.px, this.py, 36, 36);
+      else {
+        const d = a.ref, bob = (Math.abs(d.vx) + Math.abs(d.vy) > 0.1) ? Math.abs(Math.sin(t + d.bobOffset)) * -3 : 0;
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(d.x + 20, d.y + 37, 14, 5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.save();
+        if (d.facing < 0) { ctx.translate(d.x + 40, d.y + bob); ctx.scale(-1, 1); ctx.drawImage(Sprites[d.id], 0, 0, 40, 40); }
+        else ctx.drawImage(Sprites[d.id], d.x, d.y + bob, 40, 40);
+        ctx.restore();
+      }
+    });
+  }
+};
+
+/* =========================================================
+   6. RPG 世界地圖、細緻場景與劇情引擎
+========================================================= */
+const Game = {
+  canvas: document.getElementById('game-canvas'), ctx: null, mode: 'title', mapId: 'old_station',
+  player: { x:112, y:176, w:32, h:32, speed:3, facing:1, walkTick:0 },
+  fadeAlpha: 0, flashAlpha: 0, shakeTimer: 0, stepSfxTimer: 0, riderFlee: null, dogRun: null, particles: [],
+  flags: {
+    mg1Done:false, mg2Done:false, mg3Done:false, mg4Done:false, mg5Done:false, mg6Done:false,
+    mg7Done:false, mg8Done:false, mg9Done:false, hasMirror:false, hasIncense:false, hasCracker:false, hasTicket:false
+  },
+
+  init() {
+    this.ctx = this.canvas.getContext('2d');
+    this.ctx.imageSmoothingEnabled = false;
+    initSprites();
+    this.canvas.addEventListener('click', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const cx = (e.clientX - rect.left) * (512 / rect.width), cy = (e.clientY - rect.top) * (384 / rect.height);
+      if (this.mode === 'mg7') MG7.handleCanvasClick(cx, cy);
+    });
+    this.loop();
+  },
+
+  start() {
+    AudioFX.init(); AudioFX.win();
+    document.getElementById('start-screen').classList.add('hidden');
+    this.loadMap('old_station', 96, 176);
+    Dialogue.show([
+      { who: '主角', text: '唔……頭好暈，我怎麼在臺南火車站的椅子上睡著了？' },
+      { who: '主角', text: '完蛋！火車快開了！趕快摸一下口袋……' },
+      { who: '主角', text: '咦？！我的車票不見了！？明明剛剛還收在口袋裡的！' },
+      { who: '主角', text: '先在大廳四處找找看，右邊堆滿廢紙箱的角落似乎有什麼東西！' }
+    ]);
+  },
+
+  loadMap(id, px, py) {
+    this.mapId = id; this.player.x = px; this.player.y = py;
+    this.fadeAlpha = 0.9; this.riderFlee = null; this.dogRun = null; this.particles = [];
+    this.updateHUD();
+  },
+
+  updateHUD() {
+    const names = { old_station:'臺南舊火車站', roundabout:'火車站前圓環', shennong:'神農街與藥王廟', anping:'安平古堡與老街', sunset:'安平觀夕平台', new_station:'臺南新火車站' };
+    document.getElementById('loc-name').textContent = names[this.mapId] || '';
+    let q = '';
+    if (!this.flags.mg1Done) q = '任務：調查右側廢紙箱區尋找車票';
+    else if (!this.flags.mg2Done) q = '任務：與神祕人士對話';
+    else if (!this.flags.mg3Done) q = '任務：到車站外圓環的租車處騎機車';
+    else if (!this.flags.mg4Done) q = '任務：與機車騎士溝通和解';
+    else if (!this.flags.mg5Done) q = '任務：前往神農街底的藥王廟找廟公';
+    else if (!this.flags.mg6Done) q = '任務：完成廟公的考驗';
+    else if (!this.flags.mg7Done) q = '任務：在安平協助女子尋找走失小狗';
+    else if (!this.flags.mg8Done) q = '任務：完成安平美食考驗';
+    else if (!this.flags.mg9Done) q = '任務：追逐小狗前往觀夕平台';
+    else if (!this.flags.hasTicket) q = '任務：檢查口袋並前往新站大廳';
+    else q = '任務：前往新站右側「歷史窗景」見證結局';
+    document.getElementById('quest-text').textContent = q;
+    document.getElementById('item-mirror').classList.toggle('owned', this.flags.hasMirror);
+    document.getElementById('item-incense').classList.toggle('owned', this.flags.hasIncense);
+    document.getElementById('item-cracker').classList.toggle('owned', this.flags.hasCracker);
+    document.getElementById('item-ticket').classList.toggle('owned', this.flags.hasTicket);
+  },
+
+  getMapObjects() {
+    const walls = [{x:0,y:0,w:512,h:48},{x:0,y:368,w:512,h:16},{x:0,y:0,w:16,h:384},{x:496,y:0,w:16,h:384}];
+    const interactables = [];
+    let exit = null;
+
+    if (this.mapId === 'old_station') {
+      walls.push({x:64,y:120,w:96,h:32}, {x:64,y:240,w:96,h:32});
+      if (!this.flags.mg1Done) {
+        interactables.push({
+          x:340, y:140, w:64, h:96, label:'廢紙箱堆', sprite:'crate',
+          onInteract: () => Dialogue.show([{ who:'主角', text:'角落堆了好多大廢紙箱……好像有誰躲在後面？先把箱子推開吧！' }], () => MG1.start())
+        });
+      } else {
+        interactables.push({ x:390, y:170, w:32, h:32, label:'神祕人士', sprite:'mystic', onInteract: () => this.talkMysticStation() });
+      }
+      if (this.flags.mg2Done) exit = { x:224, y:340, w:64, h:32, label:'前往圓環 ▼', to:'roundabout', tx:240, ty:68 };
+    }
+
+    if (this.mapId === 'roundabout') {
+      walls.push({x:192,y:144,w:128,h:96});
+      if (!this.flags.mg3Done) {
+        interactables.push({
+          x:72, y:92, w:40, h:40, label:'租用機車', sprite:'scooter',
+          onInteract: () => Dialogue.show([{ who:'主角', text:'照神秘人的建議，先租台機車繞繞車站前圓環吧！' }], () => MG3.start())
+        });
+      } else if (!this.flags.mg4Done) {
+        interactables.push({ x:380, y:180, w:32, h:32, label:'機車騎士', sprite:'rider', onInteract: () => this.talkRider() });
+      }
+      if (this.flags.mg4Done) exit = { x:468, y:164, w:32, h:64, label:'神農街 ▶', to:'shennong', tx:40, ty:180 };
+    }
+
+    if (this.mapId === 'shennong') {
+      walls.push({x:16,y:48,w:300,h:60}, {x:340,y:48,w:156,h:120});
+      interactables.push({ x:380, y:176, w:32, h:32, label:'藥王廟廟公', sprite:'caretaker', onInteract: () => this.talkCaretaker() });
+      if (this.flags.mg6Done) exit = { x:468, y:240, w:32, h:64, label:'前往安平 ▶', to:'anping', tx:40, ty:200 };
+    }
+
+    if (this.mapId === 'anping') {
+      walls.push({x:32,y:48,w:140,h:90}, {x:280,y:48,w:200,h:60});
+      interactables.push({ x:160, y:170, w:32, h:32, label:'焦急的女子', sprite:'woman', onInteract: () => this.talkWoman() });
+      if (this.flags.mg8Done) exit = { x:468, y:180, w:32, h:64, label:'觀夕平台 ▶', to:'sunset', tx:40, ty:260 };
+    }
+
+    if (this.mapId === 'sunset') {
+      walls.push({x:0,y:0,w:512,h:210});
+      interactables.push({ x:400, y:240, w:32, h:32, label:'神祕人士', sprite:'mystic', onInteract: () => this.talkSunsetMystic() });
+    }
+
+    if (this.mapId === 'new_station') {
+      walls.push({x:80,y:130,w:96,h:32});
+      interactables.push({
+        x:380, y:140, w:48, h:48, label:'歷史窗景', sprite:'crate', isPortal:true,
+        onInteract: () => { AudioFX.win(); document.getElementById('ending-screen').classList.remove('hidden'); Game.mode = 'ending'; }
+      });
+    }
+    return { walls, interactables, exit };
+  },
+
+  triggerAfterMG1() {
+    this.flashAlpha = 0.95; this.updateHUD();
+    Dialogue.show([
+      { who: '旁白', text: '箱子從箱子堆掉了下來，頓時一陣白光閃現，一位神祕人士現身！' },
+      { who: '主角', text: '天啊，好臭…！蛤？後面居然藏著一個人！' },
+      { who: '神祕人士', text: '喂！放尊重點，什麼叫做好臭。好歹我也是個有頭有臉的人物，我香蕉你個芭樂@#~!$%#%...' },
+      { who: '神祕人士', text: '但既然你能把本尊召喚出來。我看你面色慌張，我猜你是不是掉了車票？' },
+      { who: '主角', text: '（心理OS：這傢伙臭就算了…還是個老古董…不過他怎麼知道我車票不見了？算了還是問問他好了，或許他知道什麼）' },
+      { who: '主角', text: '對，我的火車票不見了！請問你有看到嗎？' },
+      { who: '神祕人士', text: '我知道你的票在哪裡喔。不過有鑑於你之前的態度，人家才不想告訴你在哪裡~' },
+      { who: '主角', text: '好啦好啦，我道歉。不然我唱歌給你聽嘛' },
+      { who: '神祕人士', text: '別別別！不然你幫我個忙我就告訴你東西在哪裡，如何？' },
+      { who: '主角', text: '什麼忙？' },
+      { who: '神祕人士', text: '你也知道嘛，把車票變出來是需要獻祭一些東西的…' },
+      { who: '主角', text: '獻祭…該不會是要我殺人償命吧！' },
+      { who: '神祕人士', text: '你個白癡，我是要你幫我從臺南市區收集三件物品：【機車後照鏡】、【一炷香】、還有一包【蝦餅】。' },
+      { who: '主角', text: '（OS：要這些幹嘛…也太奇怪了吧，等下我找到機車後照鏡第一件事就是拿來敲他的頭）…' },
+      { who: '主角', text: '……好' },
+      { who: '神祕人士', text: '但在出發前，先讓我測驗一下你對臺南的了解程度，免得在路上迷路了' }
+    ], () => this.startMG2());
+  },
+  talkMysticStation() {
+    if (!this.flags.mg2Done) Dialogue.show([{ who:'神祕人士', text:'準備好接受地理測驗了嗎？' }], () => this.startMG2());
+    else Dialogue.show([{ who:'神祕人士', text:'去車站外面的圓環繞繞吧，說不定會有意想不到的收穫喔！' }]);
+  },
+  startMG2() {
+    QuizRunner.start('mg2', () => {
+      this.flags.mg2Done = true; this.updateHUD();
+      Dialogue.show([
+        { who: '神祕人士', text: '不錯嘛，對臺南的地理還挺熟悉的！' },
+        { who: '神祕人士', text: '聽好了，先去車站外面的圓環繞繞，說不定會有收穫。集齊三樣東西後，我們有緣再見！' },
+        { who: '主角', text: '蛤…？' },
+        { who: '神祕人士', text: '聽話，反正你等下就去對面機車行租台機車在圓環一帶繞繞' }
+      ]);
+    });
+  },
+
+  triggerAfterMG3() {
+    this.updateHUD();
+    Dialogue.show([
+      { who: '主角', text: '碰！！哇啊——看路啦，哪有人在圓環這樣騎車的，不要命了！' },
+      { who: '機車騎士', text: '拍謝拍謝！剛剛沒注意到死角！你人沒事吧？' },
+      { who: '主角', text: '幸好只是輕微擦傷……可是車子撞成這樣，你說你要怎麼賠我？' },
+      { who: '機車騎士', text: '（緊張）這樣吧！我這機車後照鏡都掉下來了…如果你能答對我幾個關於臺南旅遊的問題，我就把它送你！' }
+    ], () => this.startMG4());
+  },
+  talkRider() {
+    if (!this.flags.mg4Done) Dialogue.show([{ who:'機車騎士', text:'來吧，答對這幾題就和解！' }], () => this.startMG4());
+  },
+  startMG4() {
+    QuizRunner.start('mg4', () => {
+      this.flags.mg4Done = true; this.flags.hasMirror = true;
+      this.riderFlee = { x:380, y:180 }; AudioFX.item(); this.updateHUD();
+      Dialogue.show([
+        { who: '機車騎士', text: '哇，你真的是行家！這支【機車後照鏡】送給你，撒優哪啦！' },
+        { who: '旁白', text: '（下一秒機車騎士直接發動車子肇事逃逸！）' },
+        { who: '主角', text: '欸欸你給我回來….傻眼，一出來就出車禍，真倒楣。聽說神農街那邊有一座藥王廟很靈，我去那裏拜拜求個平安好了，說不定還能拿到一柱香。' }
+      ]);
+    });
+  },
+
+  talkCaretaker() {
+    if (!this.flags.mg5Done) {
+      Dialogue.show([
+        { who: '藥王廟廟公', text: '唉呀，年輕人你來得正好！最近颱風把神農街底這座開基藥王廟的屋頂吹壞了。' },
+        { who: '藥王廟廟公', text: '能不能幫老夫拿足夠的瓦片，好讓我把廟宇修補起來？' },
+        { who: '主角', text: '又是一個要我幫忙的，算了，來都來了~' }
+      ], () => MG5.start());
+    } else if (!this.flags.mg6Done) {
+      Dialogue.show([{ who:'藥王廟廟公', text:'屋頂修好了，接下來考考你對臺南廟宇的了解吧！' }], () => this.startMG6());
+    } else {
+      Dialogue.show([{ who:'藥王廟廟公', text:'拿著這柱香去安平一帶逛逛吧，神明會保佑你的！' }]);
+    }
+  },
+  triggerAfterMG5() {
+    this.updateHUD();
+    Dialogue.show([
+      { who: '藥王廟廟公', text: '太感謝你了！屋頂終於修補完成，藥王大帝一定會保佑你！' },
+      { who: '藥王廟廟公', text: '老夫看你與府城有緣，藥王大帝跟我說只要再回答出關於臺南廟宇的問題，這柱平安香就給你！' }
+    ], () => this.startMG6());
+  },
+  startMG6() {
+    QuizRunner.start('mg6', () => {
+      this.flags.mg6Done = true; this.flags.hasIncense = true; AudioFX.item(); this.updateHUD();
+      Dialogue.show([
+        { who: '藥王廟廟公', text: '講得真好！這【一炷香】就送給你當作謝禮吧！' },
+        { who: '主角', text: '廟公，我的車票不見了，你有頭緒嗎？' },
+        { who: '藥王廟廟公', text: '這個嘛~剛剛我跟神明請示過了，祂說你就往西直直騎到安平老街，到時候你就知道了' }
+      ]);
+    });
+  },
+
+  talkWoman() {
+    if (!this.flags.mg7Done) {
+      Dialogue.show([
+        { who: '旁白', text: '（主角騎車到安平老街，看到遠方有女生在哭，決定上前關心一下）' },
+        { who: '焦急的女子', text: '嗚嗚……怎麼辦！我的「肉燥」在安平老街走丟了！' },
+        { who: '主角', text: '肉燥…？不過就是一碗飯而已，帶你去轉角那間店吃別急，我買單！' },
+        { who: '焦急的女子', text: '…（尷尬）肉燥是我的狗…' },
+        { who: '主角', text: '…' },
+        { who: '焦急的女子', text: '…' },
+        { who: '主角', text: '好我幫妳找！請問牠有什麼特徵呢？' },
+        { who: '焦急的女子', text: '記好囉：牠有【純白色的毛】、【垂耳朵】、戴【紅色項圈】，而且項圈上還有個【金色小鈴鐺】！老街上白狗很多，千萬別認錯隻了！' }
+      ], () => MG7.start());
+    } else if (!this.flags.mg8Done) {
+      Dialogue.show([{ who:'女子', text:'謝謝你找回肉燥！答對幾個美食題目就送你蝦餅！' }], () => this.startMG8());
+    } else {
+      Dialogue.show([{ who:'女子', text:'小狗往觀夕平台的方向跑去了，拜託你了！' }]);
+    }
+  },
+  triggerAfterMG7() {
+    this.updateHUD();
+    Dialogue.show([
+      { who: '女子', text: '肉燥！！太好了，真的非常謝謝你把牠帶回來！' },
+      { who: '女子', text: '告訴你喔，我其實是美食行家，剛好買了一包安平名產想送給你當答謝，不過在這之前，我只送這份禮物給同樣懂吃的美食家，讓我來考考你對臺南美食有多了解吧！' }
+    ], () => this.startMG8());
+  },
+  startMG8() {
+    QuizRunner.start('mg8', () => {
+      this.flags.mg8Done = true; this.flags.hasCracker = true;
+      this.dogRun = { x:192, y:185 }; AudioFX.item(); this.updateHUD();
+      Dialogue.show([
+        { who: '女子', text: '完全正確！這包剛炸好的【蝦餅】送給你！' },
+        { who: '主角', text: '（湊齊了機車後照鏡、一炷香和蝦餅……咦，好像沒有發生什麼特別的事？）' },
+        { who: '女子', text: '怎麼了嗎？看你一臉困惑' },
+        { who: '旁白', text: '（這時小狗肉燥跳離女主人的懷抱，一路往海邊跑去！）' },
+        { who: '女子', text: '我的肉燥！肉燥快回來啊' },
+        { who: '主角', text: '交給我吧~我去追牠' }
+      ]);
+    });
+  },
+
+  talkSunsetMystic() {
+    if (!this.flags.mg9Done) {
+      Dialogue.show([
+        { who: '旁白', text: '（主角跑了數公里後，喘得要死，最後終於在觀夕平台的海灘上抓到小狗。這時，神祕人士再度現身！）' },
+        { who: '主角', text: '那個身影……你不是在火車站的那位神祕人士嗎！？' },
+        { who: '神祕人士', text: '又見面了，你果然收集完三樣東西來到這裡了啊。你看這片夕陽多美……' },
+        { who: '神祕人士', text: '在把你的車票給你之前，能陪我聊聊嗎…？' }
+      ], () => this.startMG9());
+    }
+  },
+  startMG9() {
+    QuizRunner.start('mg9', () => {
+      this.flags.mg9Done = true; this.updateHUD();
+      Dialogue.show([
+        { who: '神祕人士', text: '……原來真的有人還記得關於我的事啊。', onShow: () => AudioFX.setBGM('silent') },
+        { who: '主角', text: '你的意思是…？' },
+        { who: '神祕人士', text: '其實，我就是「臺南舊火車站」本人。', onShow: () => AudioFX.setBGM('emotional') },
+        { who: '主角', text: '什麼？！你就是舊火車站……！？' },
+        { who: '舊火車站之靈', text: '（望著海面上的夕陽，露出一抹溫柔的微笑）隨著鐵路地下化，我知道，我很快就要卸下重擔，把這座城市交棒給全新的車站了。' },
+        { who: '舊火車站之靈', text: '從 1936 年我落成、迎來第一班列車直到現在，整整九十個年頭……我一直站在府城的玄關，靜靜看著這座城市的消長。' },
+        { who: '舊火車站之靈', text: '月台上的離別眼淚、重逢時的擁抱，還有你們每一次趕火車時急促的腳步聲，全都深深印在我的白牆與拱廊裡。' },
+        { who: '舊火車站之靈', text: '其實，你的車票從來沒有不見，是我偷偷施了點小魔法，把你留了下來。' },
+        { who: '舊火車站之靈', text: '我看著人們總是低頭趕路、匆匆而來又匆匆而去……所以私心地想讓你停下腳步，再替我好好走過這座我守護了一輩子的城市，並見我最後一面。' },
+        { who: '舊火車站之靈', text: '你看，這一路上你帶回來的「一炷香」保佑你順遂，還有安平的「蝦餅」留住了府城的人情味。這份心意，就是我想送你的餞別禮。' },
+        { who: '舊火車站之靈', text: '謝謝你，願意在這麼忙碌的時刻，陪我走完這最後一程。' },
+        { who: '舊火車站之靈', text: '（夕陽完全沉入海平面，他的身影化作點點暖光）……現在，我的任務已經圓滿，終於可以安心休息了。帶著府城的祝福，放心往下一站前進吧。再見了，旅人。' }
+      ], () => this.triggerDizzyEnding());
+    });
+  },
+
+  triggerDizzyEnding() {
+    this.mode = 'paused'; AudioFX.win();
+    const container = document.getElementById('stage-container');
+    container.classList.add('dizzy-effect');
+    setTimeout(() => { this.loadMap('new_station', 112, 176); this.flags.hasTicket = true; AudioFX.item(); this.updateHUD(); }, 1100);
+    setTimeout(() => {
+      container.classList.remove('dizzy-effect');
+      Dialogue.show([
+        { who: '主角', text: '唔……剛才一陣天旋地轉……這裡是……全新的「臺南新火車站」！？' },
+        { who: '主角', text: '（伸手一摸口袋）……咦？！我的【火車票】好端端地就在口袋裡！' },
+        { who: '主角', text: '剛才的一切難道是夢嗎……但背包裡的後照鏡、香和蝦餅都還真實地握在手裡。' },
+        { who: '主角', text: '向右走到大廳的「歷史窗景」去看看舊車站最後一眼，再搭上列車吧。' }
+      ]);
+    }, 2300);
+  },
+
+  interactRPG() {
+    const { interactables } = this.getMapObjects();
+    const px = this.player.x + 16, py = this.player.y + 16;
+    for (const obj of interactables) {
+      if (Math.hypot(px - (obj.x + obj.w / 2), py - (obj.y + obj.h / 2)) < 58) { AudioFX.blip(); obj.onInteract(); return; }
+    }
+  },
+
+  updateRPG() {
+    let dx = 0, dy = 0;
+    if (Input.keys.up) dy -= this.player.speed;
+    if (Input.keys.down) dy += this.player.speed;
+    if (Input.keys.left) dx -= this.player.speed;
+    if (Input.keys.right) dx += this.player.speed;
+    if (dx < 0) this.player.facing = -1; else if (dx > 0) this.player.facing = 1;
+    if (dx === 0 && dy === 0) { this.player.walkTick = 0; return; }
+    this.player.walkTick++;
+    if (this.stepSfxTimer > 0) this.stepSfxTimer--; else { AudioFX.step(); this.stepSfxTimer = 16; }
+    const { walls, interactables, exit } = this.getMapObjects();
+    const blockers = [...walls, ...interactables];
+    const tryMove = (nx, ny) => {
+      const box = { x:nx + 4, y:ny + 10, w:24, h:20 };
+      return !blockers.some(b => box.x < b.x + b.w && box.x + box.w > b.x && box.y < b.y + b.h && box.y + box.h > b.y);
+    };
+    if (dx !== 0 && tryMove(this.player.x + dx, this.player.y)) this.player.x += dx;
+    if (dy !== 0 && tryMove(this.player.x, this.player.y + dy)) this.player.y += dy;
+    if (exit) {
+      const p = this.player;
+      if (p.x < exit.x + exit.w && p.x + p.w > exit.x && p.y < exit.y + exit.h && p.y + p.h > exit.y) {
+        AudioFX.step(); this.loadMap(exit.to, exit.tx, exit.ty);
+      }
+    }
+  },
+
+  drawRPG(ctx) {
+    const t = Date.now() / 300;
+    ctx.save();
+    if (this.shakeTimer > 0) { this.shakeTimer--; ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8); }
+
+    if (this.mapId === 'old_station') {
+      ctx.fillStyle = '#e6dec8'; ctx.fillRect(0, 0, 512, 384);
+      for (let y = 48; y < 384; y += 32) {
+        for (let x = 0; x < 512; x += 32) {
+          ctx.fillStyle = ((x / 32 + y / 32) % 2 === 0) ? '#ddd3b8' : '#eae2ce';
+          ctx.fillRect(x, y, 32, 32);
+          ctx.fillStyle = 'rgba(130,110,85,0.18)'; ctx.fillRect(x, y, 32, 1); ctx.fillRect(x, y, 1, 32);
+        }
+      }
+      ctx.fillStyle = '#8c2f39'; ctx.fillRect(220, 52, 72, 332);
+      ctx.fillStyle = '#f4d35e'; ctx.fillRect(223, 52, 3, 332); ctx.fillRect(286, 52, 3, 332);
+      ctx.fillStyle = '#ede0d4'; ctx.fillRect(0, 0, 512, 48);
+      ctx.fillStyle = '#9c6644'; ctx.fillRect(0, 34, 512, 14);
+      ctx.fillStyle = '#7f5539'; ctx.fillRect(0, 46, 512, 3);
+      [130, 256, 382].forEach(ax => {
+        ctx.fillStyle = '#b08968'; ctx.beginPath(); ctx.arc(ax, 48, 24, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = '#2b221e'; ctx.beginPath(); ctx.arc(ax, 48, 19, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = '#e6ccb2'; ctx.fillRect(ax - 19, 38, 38, 2); ctx.fillRect(ax - 1, 29, 2, 19);
+      });
+      ctx.fillStyle = '#5e3023'; ctx.fillRect(18, 10, 74, 38);
+      ctx.fillStyle = '#261c17'; ctx.fillRect(24, 18, 62, 22);
+      ctx.fillStyle = '#dda15e'; for (let bx = 30; bx < 84; bx += 8) ctx.fillRect(bx, 18, 2, 22);
+      ctx.fillStyle = '#ffd166'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('售票處', 38, 16);
+      ctx.fillStyle = '#3d2b1f'; ctx.fillRect(210, 4, 92, 18);
+      ctx.strokeStyle = '#f4d35e'; ctx.strokeRect(210, 4, 92, 18);
+      ctx.fillStyle = '#ffd166'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('臺南驛 1936', 222, 17);
+      ctx.fillStyle = '#5e3023'; ctx.beginPath(); ctx.arc(462, 24, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(462, 24, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#222'; ctx.fillRect(461, 16, 2, 9); ctx.fillRect(462, 23, 6, 2);
+      ctx.fillStyle = 'rgba(255,243,176,0.14)';
+      ctx.beginPath(); ctx.moveTo(237,48); ctx.lineTo(275,48); ctx.lineTo(310,210); ctx.lineTo(205,210); ctx.closePath(); ctx.fill();
+      [120, 240].forEach(by => {
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(68, by + 28, 92, 8);
+        ctx.fillStyle = '#7f5539'; ctx.fillRect(64, by, 96, 10);
+        ctx.fillStyle = '#b07d56'; ctx.fillRect(64, by + 10, 96, 14);
+        ctx.fillStyle = '#5e3023'; ctx.fillRect(64, by + 16, 96, 2); ctx.fillRect(64, by + 24, 96, 8);
+        ctx.fillStyle = '#2b2d42'; ctx.fillRect(64, by + 6, 5, 24); ctx.fillRect(155, by + 6, 5, 24);
+      });
+    }
+
+    else if (this.mapId === 'roundabout') {
+      ctx.fillStyle = '#4a4e54'; ctx.fillRect(0, 0, 512, 384);
+      for (let i = 0; i < 65; i++) {
+        ctx.fillStyle = i % 2 === 0 ? '#5c6168' : '#3d4147';
+        ctx.fillRect((i * 79 + 13) % 500, (i * 53 + 29) % 300 + 54, 3, 2);
+      }
+      ctx.strokeStyle = 'rgba(248,249,250,0.35)'; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
+      ctx.strokeRect(130, 102, 252, 180); ctx.setLineDash([]); ctx.lineWidth = 1;
+      ctx.fillStyle = '#ced4da'; ctx.fillRect(0, 0, 512, 54); ctx.fillRect(0, 356, 512, 28);
+      ctx.fillStyle = '#8d99ae'; for (let x = 0; x < 512; x += 24) { ctx.fillRect(x, 0, 1, 52); ctx.fillRect(x, 358, 1, 26); }
+      ctx.fillStyle = '#6c757d'; ctx.fillRect(0, 52, 512, 4); ctx.fillRect(0, 354, 512, 4);
+      ctx.fillStyle = '#f8f9fa';
+      for (let x = 212; x < 300; x += 16) { ctx.fillRect(x, 62, 9, 24); ctx.fillRect(x, 316, 9, 24); }
+      for (let y = 156; y < 228; y += 16) { ctx.fillRect(140, y, 22, 9); ctx.fillRect(350, y, 22, 9); }
+      ctx.fillStyle = '#6c757d'; ctx.fillRect(188, 140, 136, 104);
+      ctx.fillStyle = '#40916c'; ctx.fillRect(192, 144, 128, 96);
+      ctx.fillStyle = '#52b788'; ctx.fillRect(198, 150, 116, 84);
+      [[206,156],[306,156],[206,226],[306,226]].forEach(([tx, ty]) => {
+        ctx.fillStyle = '#2d6a4f'; ctx.beginPath(); ctx.arc(tx, ty, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#52b788'; ctx.beginPath(); ctx.arc(tx - 2, ty - 2, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e63946'; ctx.fillRect(tx - 5, ty - 5, 4, 3); ctx.fillRect(tx + 2, ty - 2, 4, 3);
+        ctx.fillStyle = '#ff9f1c'; ctx.fillRect(tx - 1, ty + 2, 3, 3);
+      });
+      ctx.fillStyle = '#adb5bd'; ctx.fillRect(224, 164, 64, 56);
+      ctx.fillStyle = '#0096c7'; ctx.fillRect(228, 168, 56, 48);
+      ctx.fillStyle = '#48cae4'; ctx.fillRect(232, 172, 48, 40);
+      ctx.fillStyle = '#caf0f8';
+      const fSize = 6 + Math.sin(t * 2.5) * 3;
+      ctx.fillRect(256 - fSize / 2, 192 - fSize / 2, fSize, fSize);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(254, 190, 4, 4);
+      ctx.fillRect(256 + Math.cos(t * 3) * 14, 192 + Math.sin(t * 3) * 10, 3, 3);
+      ctx.fillRect(256 - Math.cos(t * 3) * 14, 192 - Math.sin(t * 3) * 10, 3, 3);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('臺南車站前圓環', 216, 157);
+      ctx.fillStyle = '#5c3a21'; ctx.fillRect(44, 44, 100, 42);
+      for (let ax = 44; ax < 144; ax += 12) { ctx.fillStyle = ((ax - 44) / 12) % 2 === 0 ? '#e63946' : '#f8f9fa'; ctx.fillRect(ax, 44, 12, 14); }
+      ctx.fillStyle = '#ffd166'; ctx.fillRect(54, 62, 80, 18);
+      ctx.fillStyle = '#14101d'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('順風機車租借', 60, 75);
+      [20, 486].forEach(lx => { ctx.fillStyle = '#2b2d42'; ctx.fillRect(lx, 18, 4, 34); ctx.fillStyle = '#ffe066'; ctx.fillRect(lx - 2, 14, 8, 6); });
+      if (this.riderFlee) {
+        ctx.drawImage(Sprites.scooter, this.riderFlee.x, this.riderFlee.y + 8, 36, 36);
+        ctx.drawImage(Sprites.rider, this.riderFlee.x + 2, this.riderFlee.y - 4, 32, 32);
+        this.riderFlee.x += 6.5; if (this.riderFlee.x > 540) this.riderFlee = null;
+      }
+    }
+
+    else if (this.mapId === 'shennong') {
+      ctx.fillStyle = '#495057'; ctx.fillRect(0, 0, 512, 384);
+      for (let row = 0; row < 12; row++) {
+        const y = 108 + row * 24, off = (row % 2) * 16;
+        for (let x = 16 - off; x < 496; x += 32) {
+          ctx.fillStyle = ((row + Math.floor(x / 32)) % 3 === 0) ? '#5c636a' : '#656d75';
+          ctx.fillRect(x + 1, y + 1, 30, 22);
+          if ((row * 7 + x) % 11 === 0) { ctx.fillStyle = '#52b788'; ctx.fillRect(x + 2, y + 20, 6, 3); }
+        }
+      }
+      ctx.fillStyle = '#3d2616'; ctx.fillRect(16, 48, 300, 60);
+      ctx.fillStyle = '#2b2d42'; ctx.fillRect(16, 48, 300, 18);
+      ctx.fillStyle = '#4a4e69'; for (let rx = 20; rx < 312; rx += 10) ctx.fillRect(rx, 48, 2, 18);
+      [36, 128, 220].forEach((wx, idx) => {
+        ctx.fillStyle = '#7f5539'; ctx.fillRect(wx, 70, 56, 36);
+        ctx.fillStyle = '#ffb703'; ctx.fillRect(wx + 6, 76, 18, 16);
+        ctx.fillStyle = '#3d2616'; ctx.fillRect(wx + 14, 76, 2, 16); ctx.fillRect(wx + 6, 83, 18, 2);
+        ctx.fillStyle = '#5e3023'; ctx.fillRect(wx + 30, 74, 20, 32);
+        ctx.fillStyle = '#f4f1de'; ctx.fillRect(wx + 58, 68, 14, 30);
+        ctx.fillStyle = '#9e2a2b'; ctx.font = 'bold 9px sans-serif';
+        const sTxt = idx === 0 ? '北勢' : idx === 1 ? '青草' : '老屋';
+        ctx.fillText(sTxt[0], wx + 60, 80); ctx.fillText(sTxt[1], wx + 60, 92);
+      });
+      for (let lx = 44; lx < 306; lx += 50) {
+        const sway = Math.sin(t + lx) * 1.5;
+        ctx.fillStyle = 'rgba(255,160,60,0.22)'; ctx.beginPath(); ctx.arc(lx + sway, 108, 20, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#111'; ctx.fillRect(lx + sway - 1, 98, 2, 4);
+        ctx.fillStyle = '#e63946'; ctx.fillRect(lx + sway - 6, 101, 12, 12);
+        ctx.fillStyle = '#ffd166'; ctx.fillRect(lx + sway - 3, 104, 6, 6);
+      }
+      ctx.fillStyle = '#780000'; ctx.fillRect(340, 48, 156, 120);
+      ctx.fillStyle = '#c1121f'; ctx.fillRect(336, 46, 164, 24);
+      ctx.fillStyle = '#ffd166'; ctx.fillRect(334, 42, 12, 8); ctx.fillRect(490, 42, 12, 8); ctx.fillRect(410, 40, 16, 8);
+      ctx.fillStyle = '#e09f3e'; ctx.fillRect(368, 72, 100, 22);
+      ctx.strokeStyle = '#3d2616'; ctx.strokeRect(368, 72, 100, 22);
+      ctx.fillStyle = '#14101d'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('開基藥王廟', 385, 88);
+      ctx.fillStyle = '#2b1010'; ctx.fillRect(392, 104, 52, 64);
+      ctx.fillStyle = 'rgba(255,183,3,0.38)'; ctx.fillRect(398, 112, 40, 56);
+      ctx.fillStyle = '#d62828'; ctx.fillRect(352, 98, 12, 70); ctx.fillRect(472, 98, 12, 70);
+      ctx.fillStyle = '#adb5bd'; ctx.fillRect(350, 160, 16, 10); ctx.fillRect(470, 160, 16, 10);
+      ctx.fillStyle = '#b08968'; ctx.fillRect(410, 156, 18, 12);
+      if (Math.random() < 0.16) this.particles.push({ x:419 + (Math.random() * 6 - 3), y:154, vy:-0.6, life:48 });
+      for (let i = this.particles.length - 1; i >= 0; i--) {
+        const pt = this.particles[i]; pt.y += pt.vy; pt.life--;
+        ctx.fillStyle = `rgba(240,240,240,${pt.life / 60})`;
+        ctx.fillRect(pt.x + Math.sin(pt.life / 6) * 2, pt.y, 4, 4);
+        if (pt.life <= 0) this.particles.splice(i, 1);
+      }
+      if (!this.flags.mg5Done) {
+        ctx.fillStyle = '#1d1d1d'; ctx.fillRect(352, 54, 24, 12);
+        ctx.fillStyle = '#ffd166'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('屋頂破損!', 346, 38);
+      }
+    }
+
+    else if (this.mapId === 'anping') {
+      ctx.fillStyle = '#e9c46a'; ctx.fillRect(0, 0, 512, 384);
+      for (let y = 140; y < 368; y += 24) {
+        for (let x = 16; x < 496; x += 32) {
+          ctx.fillStyle = ((x + y) % 64 === 0) ? '#e0b85c' : '#eccb76';
+          ctx.fillRect(x + 1, y + 1, 30, 22);
+        }
+      }
+      ctx.fillStyle = '#9e2a2b'; ctx.fillRect(32, 48, 140, 90);
+      for (let by = 52; by < 134; by += 8) {
+        const boff = ((by / 8) % 2) * 8;
+        for (let bx = 34 + boff; bx < 166; bx += 16) {
+          ctx.fillStyle = (bx + by) % 3 === 0 ? '#b54434' : '#c85a48';
+          ctx.fillRect(bx, by, 14, 6);
+        }
+      }
+      for (let cx = 32; cx < 170; cx += 20) { ctx.fillStyle = '#9e2a2b'; ctx.fillRect(cx, 38, 12, 12); }
+      ctx.fillStyle = '#f8f9fa'; ctx.fillRect(82, 14, 40, 40);
+      ctx.fillStyle = '#48cae4'; ctx.fillRect(88, 22, 28, 10);
+      ctx.fillStyle = '#d62828'; ctx.fillRect(76, 8, 52, 8); ctx.fillRect(88, 2, 28, 6);
+      ctx.fillStyle = '#386641'; ctx.beginPath(); ctx.arc(46, 56, 20, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6a994e'; ctx.beginPath(); ctx.arc(42, 52, 13, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#582f0e'; [38, 46, 54].forEach(rx => ctx.fillRect(rx, 66, 2, 54));
+      ctx.fillStyle = '#2b2d42'; ctx.fillRect(142, 46, 18, 6);
+      ctx.fillStyle = '#7f5539'; ctx.fillRect(144, 52, 12, 6);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('安平古堡', 76, 118);
+      ctx.fillStyle = '#adb5bd'; ctx.fillRect(216, 54, 34, 34);
+      ctx.fillStyle = '#e63946'; ctx.fillRect(222, 60, 22, 20);
+      ctx.fillStyle = '#ffd166'; ctx.fillRect(226, 65, 4, 4); ctx.fillRect(236, 65, 4, 4);
+      ctx.fillStyle = '#3d2616'; ctx.font = '10px sans-serif'; ctx.fillText('劍獅', 223, 100);
+      ctx.fillStyle = '#7f5539'; ctx.fillRect(280, 48, 200, 62);
+      for (let ax = 280; ax < 480; ax += 20) {
+        ctx.fillStyle = ((ax - 280) / 20) % 2 === 0 ? '#e63946' : '#f1faee';
+        ctx.fillRect(ax, 46, 20, 18);
+      }
+      [304, 344, 424].forEach(bx => {
+        ctx.fillStyle = '#bc6c25'; ctx.fillRect(bx, 88, 28, 16);
+        ctx.fillStyle = '#ffd166'; ctx.fillRect(bx + 4, 84, 8, 6); ctx.fillRect(bx + 14, 85, 8, 6);
+      });
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('安平老街・手工蝦餅', 320, 78);
+      if (this.dogRun) {
+        ctx.drawImage(Sprites.dog_target, this.dogRun.x, this.dogRun.y + Math.abs(Math.sin(t * 4)) * -4, 34, 34);
+        this.dogRun.x += 4.5; if (this.dogRun.x > 520) this.dogRun = null;
+      }
+    }
+
+    else if (this.mapId === 'sunset') {
+      const grad = ctx.createLinearGradient(0, 0, 0, 140);
+      grad.addColorStop(0, '#3c096c'); grad.addColorStop(0.4, '#9d0208');
+      grad.addColorStop(0.75, '#e85d04'); grad.addColorStop(1, '#faa307');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, 512, 140);
+      ctx.fillStyle = 'rgba(255,190,140,0.35)';
+      [0, 1, 2].forEach(ci => {
+        const cx = ((t * 8 + ci * 180) % 580) - 60, cy = 28 + ci * 22;
+        ctx.fillRect(cx, cy, 56, 8); ctx.fillRect(cx + 12, cy - 6, 32, 6);
+      });
+      ctx.fillStyle = '#240046';
+      [[110,44],[134,52],[380,38]].forEach(([gx, gy]) => {
+        const flap = Math.sin(t * 2 + gx) > 0 ? 0 : 2;
+        ctx.fillRect(gx - 4, gy + flap, 4, 2); ctx.fillRect(gx, gy + 2, 3, 2); ctx.fillRect(gx + 3, gy + flap, 4, 2);
+      });
+      ctx.fillStyle = 'rgba(255,209,102,0.25)'; ctx.beginPath(); ctx.arc(256, 126, 48 + Math.sin(t) * 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(256, 126, 36, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#1d3557'; ctx.fillRect(0, 136, 512, 74);
+      ctx.fillStyle = '#274c77'; ctx.fillRect(0, 136, 512, 24);
+      ctx.fillStyle = '#ffb703';
+      for (let i = 0; i < 8; i++) {
+        const wy = 142 + i * 8, ww = 54 - i * 4;
+        ctx.fillRect(256 - ww / 2 + Math.sin(t + i) * 6, wy, ww, 3);
+      }
+      ctx.fillStyle = 'rgba(241,250,238,0.75)';
+      for (let wx = 0; wx < 512; wx += 16) ctx.fillRect(wx, 206 + Math.sin(t * 2 + wx * 0.05) * 3, 14, 4);
+      ctx.fillStyle = '#d4a373'; ctx.fillRect(0, 210, 512, 18);
+      ctx.fillStyle = '#e6ccb2'; ctx.fillRect(0, 228, 512, 156);
+      ctx.fillStyle = '#f8edeb'; ctx.fillRect(88, 326, 6, 4); ctx.fillRect(290, 344, 6, 4);
+      ctx.fillStyle = '#e76f51'; ctx.fillRect(184, 336, 6, 6);
+      ctx.fillStyle = '#7f5539'; ctx.fillRect(0, 224, 464, 64);
+      ctx.fillStyle = '#5c3a21'; for (let x = 0; x < 464; x += 20) ctx.fillRect(x, 224, 2, 64);
+      ctx.fillStyle = '#9c6644'; ctx.fillRect(0, 224, 464, 6);
+      for (let px = 16; px < 464; px += 44) {
+        ctx.fillStyle = '#3d2616'; ctx.fillRect(px, 216, 6, 14); ctx.fillRect(px, 282, 6, 10);
+        ctx.fillStyle = 'rgba(255,209,102,0.35)'; ctx.beginPath(); ctx.arc(px + 3, 218, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffd166'; ctx.fillRect(px + 1, 216, 4, 4);
+      }
+      if (this.flags.mg8Done) ctx.drawImage(Sprites.dog_target, 350, 254 + Math.sin(t * 2) * 1.5, 32, 32);
+    }
+
+    else if (this.mapId === 'new_station') {
+      ctx.fillStyle = '#edf2f4'; ctx.fillRect(0, 0, 512, 384);
+      for (let y = 48; y < 384; y += 32) {
+        for (let x = 0; x < 512; x += 32) {
+          ctx.fillStyle = ((x / 32 + y / 32) % 2 === 0) ? '#e2eaf0' : '#f4f7f9';
+          ctx.fillRect(x, y, 32, 32);
+        }
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.beginPath(); ctx.moveTo(60,48); ctx.lineTo(140,48); ctx.lineTo(260,384); ctx.lineTo(180,384); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffd166'; ctx.fillRect(16, 216, 480, 12);
+      ctx.fillStyle = '#e09f3e'; for (let tx = 20; tx < 490; tx += 8) ctx.fillRect(tx, 219, 3, 6);
+      ctx.fillStyle = '#2b2d42'; ctx.fillRect(0, 0, 512, 48);
+      ctx.fillStyle = '#4ecdc4'; ctx.fillRect(0, 45, 512, 3);
+      ctx.fillStyle = '#14101d'; ctx.fillRect(116, 8, 280, 32);
+      ctx.strokeStyle = '#4ecdc4'; ctx.strokeRect(116, 8, 280, 32);
+      ctx.fillStyle = '#4ecdc4'; ctx.font = 'bold 12px monospace'; ctx.fillText('TAINAN NEW STATION ｜ 列車準點', 132, 28);
+      if (Math.floor(t * 2) % 2 === 0) { ctx.fillStyle = '#52b788'; ctx.fillRect(380, 20, 8, 8); }
+      ctx.fillStyle = '#8d99ae'; ctx.fillRect(80, 130, 96, 32);
+      ctx.fillStyle = '#6c757d'; ctx.fillRect(80, 156, 96, 6);
+      [[30,64],[462,64]].forEach(([px, py]) => {
+        ctx.fillStyle = '#f8f9fa'; ctx.fillRect(px, py + 12, 24, 16);
+        ctx.fillStyle = '#40916c'; ctx.beginPath(); ctx.arc(px + 12, py + 8, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#52b788'; ctx.beginPath(); ctx.arc(px + 10, py + 6, 7, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+
+    const { interactables, exit } = this.getMapObjects();
+    if (exit) {
+      ctx.fillStyle = 'rgba(78, 205, 196, 0.35)'; ctx.fillRect(exit.x, exit.y, exit.w, exit.h);
+      ctx.strokeStyle = '#4ecdc4'; ctx.strokeRect(exit.x, exit.y, exit.w, exit.h);
+      ctx.fillStyle = '#ffe66d'; ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(exit.label, Math.min(430, exit.x - 10), exit.y - 6 + Math.sin(t * 2) * 3);
+    }
+
+    const px = this.player.x + 16, py = this.player.y + 16;
+    interactables.forEach(obj => {
+      if (obj.isPortal) {
+        ctx.fillStyle = '#4ecdc4'; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = '#ffd166'; ctx.fillRect(obj.x + 4, obj.y + 4, obj.w - 8, obj.h - 8);
+        ctx.fillStyle = '#9c6644'; ctx.fillRect(obj.x + 6, obj.y + 20, obj.w - 12, 18);
+        ctx.fillStyle = '#5e3023'; [14, 24, 34].forEach(ax => ctx.fillRect(obj.x + ax - 3, obj.y + 26, 6, 12));
+        ctx.fillStyle = '#14101d'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('歷史窗景', obj.x + 4, obj.y + 16);
+      } else {
+        ctx.drawImage(Sprites[obj.sprite], obj.x, obj.y, obj.w, obj.h);
+      }
+      const dist = Math.hypot(px - (obj.x + obj.w / 2), py - (obj.y + obj.h / 2));
+      if (dist < 58 && this.mode === 'rpg') {
+        ctx.fillStyle = 'rgba(20,16,29,0.88)'; ctx.fillRect(obj.x + obj.w / 2 - 42, obj.y - 24, 84, 18);
+        ctx.strokeStyle = '#f4d35e'; ctx.strokeRect(obj.x + obj.w / 2 - 42, obj.y - 24, 84, 18);
+        ctx.fillStyle = '#ffd166'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('[空白鍵] 互動', obj.x + obj.w / 2 - 36, obj.y - 11);
+      } else {
+        ctx.fillStyle = '#ffd166'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('!', obj.x + obj.w / 2 - 2, obj.y - 6 + Math.sin(t * 2) * 3);
+      }
+    });
+
+    const walkBob = this.player.walkTick > 0 ? Math.abs(Math.sin(this.player.walkTick * 0.35)) * -3 : 0;
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(this.player.x + 16, this.player.y + 30, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    if (this.player.facing < 0) {
+      ctx.translate(this.player.x + this.player.w, this.player.y + walkBob); ctx.scale(-1, 1);
+      ctx.drawImage(Sprites.player, 0, 0, this.player.w, this.player.h);
+    } else {
+      ctx.drawImage(Sprites.player, this.player.x, this.player.y + walkBob, this.player.w, this.player.h);
+    }
+    ctx.restore();
+
+    if (this.flashAlpha > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${this.flashAlpha})`; ctx.fillRect(0, 0, 512, 384);
+      this.flashAlpha = Math.max(0, this.flashAlpha - 0.04);
+    }
+    if (this.fadeAlpha > 0) {
+      ctx.fillStyle = `rgba(10,8,18,${this.fadeAlpha})`; ctx.fillRect(0, 0, 512, 384);
+      this.fadeAlpha = Math.max(0, this.fadeAlpha - 0.05);
+    }
+    ctx.restore();
+  },
+
+  loop() {
+    if (this.mode === 'rpg') { this.updateRPG(); this.drawRPG(this.ctx); }
+    else if (['dialogue','quiz','paused','ending'].includes(this.mode)) { if (this.mapId) this.drawRPG(this.ctx); }
+    else if (this.mode === 'mg1') { MG1.update(); MG1.draw(this.ctx); }
+    else if (this.mode === 'mg3') { MG3.update(); MG3.draw(this.ctx); }
+    else if (this.mode === 'mg5') { MG5.update(); MG5.draw(this.ctx); }
+    else if (this.mode === 'mg7') { MG7.update(); MG7.draw(this.ctx); }
+    requestAnimationFrame(() => this.loop());
+  }
+};
+
+/* =========================================================
+   7. 輸入控制 (鍵盤 + 螢幕虛擬按鍵)
+========================================================= */
+const Input = {
+  keys: { up:false, down:false, left:false, right:false },
+  hold(dir, state) { this.keys[dir] = state; },
+  resetKeys() { this.keys.up = this.keys.down = this.keys.left = this.keys.right = false; },
+  triggerAction() {
+    AudioFX.init();
+    if (Game.mode === 'dialogue') Dialogue.advance();
+    else if (Game.mode === 'rpg') Game.interactRPG();
+    else if (Game.mode === 'mg7') MG7.inspectNear();
+    else if (Game.mode === 'quiz') {
+      const nextBtn = document.getElementById('quiz-next-btn');
+      if (!nextBtn.classList.contains('hidden')) nextBtn.click();
+    }
+  }
+};
+
+window.addEventListener('blur', () => Input.resetKeys());
+
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+  if (k === 'arrowup' || k === 'w') Input.keys.up = true;
+  if (k === 'arrowdown' || k === 's') Input.keys.down = true;
+  if (k === 'arrowleft' || k === 'a') Input.keys.left = true;
+  if (k === 'arrowright' || k === 'd') Input.keys.right = true;
+  if (Game.mode === 'mg1' && (k === 'z' || k === 'u' || k === 'backspace')) { e.preventDefault(); MG1.undo(); return; }
+  if (k === ' ' || k === 'enter' || k === 'z') Input.triggerAction();
+  if (k === 'r' && Game.mode === 'mg1') MG1.start();
+});
+
+window.addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowup' || k === 'w') Input.keys.up = false;
+  if (k === 'arrowdown' || k === 's') Input.keys.down = false;
+  if (k === 'arrowleft' || k === 'a') Input.keys.left = false;
+  if (k === 'arrowright' || k === 'd') Input.keys.right = false;
+});
+
+Game.init();
+</script>
+</body>
+</html>
